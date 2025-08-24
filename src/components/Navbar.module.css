@@ -1,0 +1,211 @@
+.navbar {
+  background-color: #1f2937; /* slate-800 */
+  padding: 14px 0;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.navContainer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+  position: relative;
+}
+
+/* Brand */
+.brand {
+  color: #fff;
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: .4px;
+  text-decoration: none;
+}
+
+/* Desktop links */
+.navLinks {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+/* Shared link style */
+.navLink {
+  color: #e5e7eb; /* gray-200 */
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: color .2s ease;
+  text-transform: none;
+}
+.navLink:hover,
+.navLink:focus {
+  color: #22d3ee; /* cyan-400 */
+  outline: none;
+}
+
+/* Mobile toggle */
+.menuButton {
+  display: none;
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 6px;
+}
+
+/* Profile button + avatar */
+.profileWrap {
+  position: relative;
+  margin-left: 6px;
+}
+
+.userBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.1);
+  padding: 6px 8px;
+  border-radius: 9999px;
+  cursor: pointer;
+  color: #e5e7eb;
+}
+.userBtn:focus-visible {
+  outline: 2px solid #22d3ee;
+  outline-offset: 2px;
+}
+
+.profileImg {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+.caret {
+  font-size: .85rem;
+  transform: translateY(1px);
+  opacity: .8;
+}
+
+/* Dropdown menu */
+.menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 10px);
+  background: #111827; /* gray-900 */
+  color: #e5e7eb;
+  width: 280px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.35);
+  padding: 8px 0;
+  opacity: 0;
+  transform: translateY(-6px);
+  pointer-events: none;
+  transition: opacity .15s ease, transform .15s ease;
+}
+.menu.open {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.menuHeader {
+  padding: 10px 14px 12px 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.menuName {
+  font-weight: 700;
+  font-size: .95rem;
+}
+.menuEmail {
+  display: block;
+  font-size: .85rem;
+  color: #9ca3af; /* gray-400 */
+  margin-top: 2px;
+  word-break: break-all;
+}
+
+.menuItem {
+  display: block;
+  width: 100%;
+  padding: 12px 14px;
+  text-decoration: none;
+  color: #e5e7eb;
+  font-weight: 500;
+  transition: background .15s ease, color .15s ease;
+}
+.menuItem:hover,
+.menuItem:focus {
+  background: rgba(255,255,255,0.06);
+  color: #fff;
+  outline: none;
+}
+
+.menuDivider {
+  height: 1px;
+  background: rgba(255,255,255,0.06);
+  margin: 6px 0;
+}
+
+/* ===== Mobile ===== */
+@media (max-width: 768px) {
+  .menuButton {
+    display: inline-block;
+  }
+
+  .navLinks {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #1f2937;
+    flex-direction: column;
+    gap: 0;
+    padding: 0;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height .25s ease, padding .25s ease;
+    box-shadow: 0 2px 8px rgba(0,0,0,.25);
+  }
+  .navLinks.open {
+    max-height: 360px;
+    padding: 10px 0 14px;
+  }
+
+  .navLink {
+    padding: 12px 20px;
+    width: 100%;
+  }
+
+  .profileWrap {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    padding: 6px 0 2px;
+  }
+
+  /* Let dropdown align centered under avatar on mobile */
+  .menu {
+    right: 50%;
+    transform: translate(50%, -6px);
+  }
+  .menu.open {
+    transform: translate(50%, 0);
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .menu,
+  .navLinks {
+    transition: none;
+  }
+}
