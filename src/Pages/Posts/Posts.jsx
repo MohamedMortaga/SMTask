@@ -134,7 +134,7 @@ export default function Posts() {
         if (raw) updatedPost = normalizePost(raw);
         success = true;
         break;
-      } catch (_) {
+      } catch (e) {
         // try next header variant
       }
     }
@@ -182,7 +182,7 @@ export default function Posts() {
         await axios.delete(`${POST_BASE}/${id}`, cfg);
         success = true;
         break;
-      } catch (_) {
+      } catch (e) {
         // try next header variant
       }
     }
