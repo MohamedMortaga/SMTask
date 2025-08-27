@@ -362,3 +362,33 @@
     transition: none;
   }
 }
+/* put this near your .menu rules */
+.menu {
+  z-index: 1000; /* make sure it floats above */
+}
+
+/* ===== Mobile ===== */
+@media (max-width: 768px) {
+  .navLinks {
+    /* keeps it collapsed when closed */
+    overflow: hidden;
+  }
+
+  .navLinks.open {
+    max-height: 360px;
+    padding: 10px 0 14px;
+    overflow: visible;        /* <-- allow dropdown to escape */
+  }
+
+  /* (optional) make the anchor element not be the clipping parent */
+  .profileWrap { position: static; }
+
+  /* center the dropdown under the avatar, as you already do */
+  .menu {
+    right: 50%;
+    transform: translate(50%, -6px);
+  }
+  .menu.open {
+    transform: translate(50%, 0);
+  }
+}
