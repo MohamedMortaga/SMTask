@@ -43,7 +43,7 @@ const API = "https://linked-posts.routemisr.com";
 const PAGE_SIZE = 5;
 
 // server-side page size for POSTS
-const POSTS_LIMIT = 10;
+const POSTS_LIMIT = 20;
 
 // read token
 const getToken = () => {
@@ -56,7 +56,9 @@ const getToken = () => {
     const user = JSON.parse(localStorage.getItem("user") || "null");
     if (user?.token) return user.token;
     if (user?.data?.token) return user.data.token;
-  } catch {}
+  } catch {
+    return null;
+  }
   return null;
 };
 
@@ -152,7 +154,7 @@ const logAxiosError = (label, err) => {
   }
 };
 
-// small helper to safely read pagination meta from API
+// read pagination meta (fallback if API doesn't give totals)
 const getPostPagination = (data, limit, listLen) => {
   const meta =
     data?.paginationResult ||
@@ -174,12 +176,12 @@ const getPostPagination = (data, limit, listLen) => {
     meta.page ||
     undefined;
 
-  // Fallback if API doesn't return totals: assume "more pages if list == limit"
+  // Fallback: allow going Next if we got a full page (listLen === limit)
   const fallbackPages =
     typeof totalPages === "number"
       ? totalPages
       : listLen === limit
-      ? (current || 1) + 1 // show at least next
+      ? (current || 1) + 1
       : current || 1;
 
   return {
@@ -373,6 +375,7 @@ export default function Home() {
   const fetchPosts = async (page = 1) => {
     setLoadingPosts(true);
     setErr("");
+
     try {
       const { data } = await axios.get(
         `${API}/posts?page=${page}&limit=${POSTS_LIMIT}`,
@@ -404,12 +407,14 @@ export default function Home() {
         previews[pid] = norm[0] || null;
       });
 
-      const { page: current, totalPages } = getPostPagination(data, POSTS_LIMIT, list.length);
+      const { totalPages } = getPostPagination(data, POSTS_LIMIT, list.length);
 
       setCommentsCache((prev) => ({ ...prev, ...cache }));
       setPosts(normalized);
+
+      // trust the page we requested (don't rely on server currentPage)
       setPostTotalPages(Math.max(1, totalPages || 1));
-      setPostPage(current || page);
+      setPostPage(page);
 
       setCmap((prev) => {
         const next = { ...prev };
@@ -742,7 +747,6 @@ export default function Home() {
   const canEditDelete = (comment) => {
     if (!me?.id) return false;
     return comment.authorId === me.id;
-    // NOTE: if API uses different author fields, adjust here.
   };
 
   /* ---------- posts pager UI ---------- */
@@ -837,7 +841,6 @@ export default function Home() {
       <div className="w-[90%] max-w-3xl mt-8 space-y-5">
         <div className="flex items-center justify-between">
           <h4 className="text-gray-300 font-semibold">Latest Posts</h4>
-          {/* quick page indicator */}
           {postTotalPages > 1 && (
             <span className="text-gray-400 text-sm">
               Page {postPage} / {postTotalPages}
