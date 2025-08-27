@@ -1,83 +1,243 @@
-// Posts.jsx
+// src/Pages/Posts/Posts.jsx
 import { useEffect, useState } from "react";
 import axios from "axios";
 
-const USER_ID = "664bcf3e33da217c4af21f00"; // from your link
-const LIST_BASE = `https://linked-posts.routemisr.com/users/${USER_ID}/posts`;
-const POST_BASE = `https://linked-posts.routemisr.com/posts`;
+/* ------------ config ------------ */
+const API = "https://linked-posts.routemisr.com";
+const PAGE_LIMIT = 5;
 
-const normalizePost = (p = {}) => ({
-  id: p._id || p.id,
-  title: p.title || p.caption || "Untitled",
-  body: p.body || p.content || "",
-  image: p.image || p.photo || (Array.isArray(p.images) ? p.images[0] : null),
-  createdAt: p.createdAt || p.created_at || p.date || null,
-  author:
-    p.user?.name ||
-    p.author?.name ||
-    p.username ||
-    (p.user && (p.user.full_name || p.user.fullName)) ||
-    "Unknown",
-});
+/* ------------ helpers ------------ */
+const getToken = () => {
+  try {
+    const strip = (s) => (s ? s.replace(/^"(.*)"$/, "$1") : s);
+    for (const k of ["token", "Token", "userToken", "authToken"]) {
+      const v = strip(localStorage.getItem(k));
+      if (v && v !== "null" && v !== "undefined") return v;
+    }
+    const user = JSON.parse(localStorage.getItem("user") || "null");
+    if (user?.token) return user.token;
+    if (user?.data?.token) return user.data.token;
+  } catch {}
+  return null;
+};
 
-function getHeaderConfigs() {
-  const token = localStorage.getItem("token");
-  if (!token) return [ { headers: {} } ];
-  return [
-    { headers: { token } },
-    { headers: { Authorization: `Bearer ${token}` } },
-    { headers: { Authorization: token } },
-  ];
-}
+const headerVariants = (token) =>
+  token
+    ? [
+        { headers: { token } }, // primary for this API
+        { headers: { Authorization: `Bearer ${token}` } },
+        { headers: { Authorization: token } },
+      ]
+    : [{ headers: {} }];
 
+const extractArray = (resp) => {
+  const d = resp?.data ?? resp;
+  if (Array.isArray(d)) return d;
+  if (Array.isArray(d?.posts)) return d.posts;
+  if (Array.isArray(d?.data?.posts)) return d.data.posts;
+  if (Array.isArray(d?.data)) return d.data;
+  if (Array.isArray(d?.results)) return d.results;
+  if (Array.isArray(d?.items)) return d.items;
+  // scan nested objects for the first array
+  for (const v of Object.values(d || {})) {
+    if (Array.isArray(v)) return v;
+    if (v && typeof v === "object") {
+      for (const vv of Object.values(v)) if (Array.isArray(vv)) return vv;
+    }
+  }
+  return [];
+};
+
+const normalizePost = (p = {}) => {
+  const u = p.user || p.author || p.createdBy || p.owner || {};
+  const authorName =
+    u.name ||
+    u.fullName ||
+    u.full_name ||
+    u.username ||
+    u.email?.split("@")[0] ||
+    "Unknown";
+  return {
+    id: p._id || p.id,
+    body: p.body || p.content || p.caption || "",
+    image: p.image || p.photo || (Array.isArray(p.images) ? p.images[0] : null),
+    createdAt: p.createdAt || p.created_at || p.date || null,
+    author: authorName,
+    authorId: u._id || u.id || null,
+  };
+};
+
+const logAxiosError = (label, err) => {
+  const status = err?.response?.status;
+  const msg = err?.message;
+  console.warn(`⚠️ ${label} — status:${status ?? "?"} message:${msg ?? "?"}`);
+  if (err?.response?.data) {
+    try {
+      console.warn("↳ payload:", JSON.stringify(err.response.data, null, 2));
+    } catch {
+      console.warn("↳ payload: <unserializable>");
+    }
+  }
+};
+
+/* ------------ component ------------ */
 export default function Posts() {
+  const [token, setToken] = useState(getToken());
+  const [userId, setUserId] = useState(null);
+  const [checkingUser, setCheckingUser] = useState(true);
+
   const [posts, setPosts] = useState([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
 
-  // edit state
-  const [editingId, setEditingId] = useState(null);
-  const [editBody, setEditBody] = useState("");
-  const [editImage, setEditImage] = useState(null);
-  const [saving, setSaving] = useState(false);
-  const [deletingId, setDeletingId] = useState(null);
+  // keep axios headers synced
+  useEffect(() => {
+    if (token) {
+      axios.defaults.headers.common["token"] = token;
+      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+      axios.defaults.headers.common["Accept"] = "application/json";
+    } else {
+      delete axios.defaults.headers.common["token"];
+      delete axios.defaults.headers.common["Authorization"];
+    }
+  }, [token]);
 
+  // watch localStorage changes from other tabs
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (["token", "Token", "userToken", "authToken", "user"].includes(e.key)) {
+        setToken(getToken());
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  /* ---- resolve userId from /users/profile-data ---- */
+  useEffect(() => {
+    let cancelled = false;
+
+    const resolveUser = async () => {
+      setCheckingUser(true);
+      setErr("");
+
+      if (!token) {
+        setUserId(null);
+        setCheckingUser(false);
+        return;
+      }
+
+      // quick local guess
+      try {
+        const raw = JSON.parse(localStorage.getItem("user") || "null");
+        const idFromLocal =
+          raw?.id || raw?._id || raw?.userId || raw?.data?._id || raw?.data?.id;
+        if (idFromLocal) {
+          if (!cancelled) setUserId(idFromLocal);
+          setCheckingUser(false);
+          return;
+        }
+      } catch {}
+
+      // authoritative ask the API
+      for (const cfg of headerVariants(token)) {
+        try {
+          const { data } = await axios.get(`${API}/users/profile-data`, cfg);
+          const u = data?.user || data?.data || data || {};
+          const id = u._id || u.id;
+          if (id) {
+            if (!cancelled) setUserId(id);
+            setCheckingUser(false);
+            return;
+          }
+        } catch (e) {
+          logAxiosError("profile-data failed", e);
+        }
+      }
+
+      if (!cancelled) {
+        setErr("Couldn’t read your profile. Please re-login.");
+        setUserId(null);
+        setCheckingUser(false);
+      }
+    };
+
+    resolveUser();
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  /* ---------------- fetch posts ---------------- */
   const fetchPosts = async ({ reset = false } = {}) => {
+    if (!userId) return;
     setLoading(true);
     setErr("");
 
-    const headersVariants = getHeaderConfigs();
+    const curPage = reset ? 1 : page;
+    const limit = PAGE_LIMIT;
 
-    const limit = 2;
-    const urlPage = `${LIST_BASE}?limit=${limit}&page=${reset ? 1 : page}`;
-    const urlSkip = `${LIST_BASE}?limit=${limit}&skip=${(reset ? 0 : (page - 1)) * limit}`;
+    // primary route (two pagination styles)
+    const urlPage = `${API}/users/${userId}/posts?limit=${limit}&page=${curPage}`;
+    const urlSkip = `${API}/users/${userId}/posts?limit=${limit}&skip=${
+      (curPage - 1) * limit
+    }`;
+
+    // plan B: fetch general posts and filter locally
+    const planB = async (cfg) => {
+      // pull a larger page to find yours
+      const fallbackUrl = `${API}/posts?limit=${Math.max(
+        50,
+        limit * 3
+      )}&page=1`;
+      try {
+        const res = await axios.get(fallbackUrl, cfg);
+        const all = extractArray(res).map(normalizePost);
+        const mine = all.filter((p) => p.authorId === userId);
+        const pageSlice = mine.slice((curPage - 1) * limit, curPage * limit);
+        setPosts((cur) => (reset ? pageSlice : [...cur, ...pageSlice]));
+        setHasMore(mine.length > curPage * limit);
+        return true;
+      } catch (e) {
+        logAxiosError("fallback /posts failed", e);
+        return false;
+      }
+    };
 
     let success = false;
-    for (const cfg of headersVariants) {
+
+    for (const cfg of headerVariants(token)) {
+      // try page variant
       try {
-        const { data } = await axios.get(urlPage, cfg);
-        const rawList =
-          data?.data?.posts || data?.posts || data?.data || data || [];
-        const next = rawList.map(normalizePost);
-        setPosts((cur) => (reset ? next : [...cur, ...next]));
-        setHasMore(next.length === limit);
+        const res = await axios.get(urlPage, cfg);
+        const arr = extractArray(res).map(normalizePost);
+        setPosts((cur) => (reset ? arr : [...cur, ...arr]));
+        setHasMore(arr.length === limit);
         success = true;
         break;
-      } catch {
-        try {
-          const { data } = await axios.get(urlSkip, cfg);
-          const rawList =
-            data?.data?.posts || data?.posts || data?.data || data || [];
-          const next = rawList.map(normalizePost);
-          setPosts((cur) => (reset ? next : [...cur, ...next]));
-          setHasMore(next.length === limit);
-          success = true;
-          break;
-        } catch {
-          // try next header
-        }
+      } catch (e) {
+        logAxiosError("GET user posts (page) failed", e);
+      }
+
+      // try skip variant
+      try {
+        const res = await axios.get(urlSkip, cfg);
+        const arr = extractArray(res).map(normalizePost);
+        setPosts((cur) => (reset ? arr : [...cur, ...arr]));
+        setHasMore(arr.length === limit);
+        success = true;
+        break;
+      } catch (e) {
+        logAxiosError("GET user posts (skip) failed", e);
+      }
+
+      // try plan B
+      const ok = await planB(cfg);
+      if (ok) {
+        success = true;
+        break;
       }
     }
 
@@ -85,269 +245,98 @@ export default function Posts() {
     setLoading(false);
   };
 
+  // initial load after userId
   useEffect(() => {
-    fetchPosts({ reset: true });
+    if (userId) {
+      setPage(1);
+      fetchPosts({ reset: true });
+    } else {
+      setPosts([]);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [userId]);
 
+  // load more
   useEffect(() => {
     if (page > 1) fetchPosts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
 
-  /* ---------------- actions: edit / delete ---------------- */
-
-  const startEdit = (p) => {
-    setEditingId(p.id);
-    setEditBody(p.body || "");
-    setEditImage(null);
-  };
-
-  const cancelEdit = () => {
-    setEditingId(null);
-    setEditBody("");
-    setEditImage(null);
-    setSaving(false);
-  };
-
-  const saveEdit = async () => {
-    if (!editingId) return;
-    setSaving(true);
-    setErr("");
-
-    const headersVariants = getHeaderConfigs();
-    const fd = new FormData();
-    fd.append("body", editBody || "");
-    if (editImage) {
-      fd.append("image", editImage);
-    }
-
-    let success = false;
-    let updatedPost = null;
-
-    for (const cfg of headersVariants) {
-      try {
-        // IMPORTANT: do NOT set Content-Type manually; axios sets multipart boundary.
-        const { data } = await axios.put(`${POST_BASE}/${editingId}`, fd, cfg);
-        const raw =
-          data?.data?.post || data?.post || data?.data || data || null;
-        if (raw) updatedPost = normalizePost(raw);
-        success = true;
-        break;
-      } catch (e) {
-        // try next header variant
-      }
-    }
-
-    if (!success) {
-      setErr("Couldn’t update the post. Check your token or try again.");
-      setSaving(false);
-      return;
-    }
-
-    if (updatedPost) {
-      setPosts((cur) =>
-        cur.map((x) => (x.id === editingId ? { ...x, ...updatedPost } : x))
-      );
-    } else {
-      // fallback: update locally if API didn’t return a full object
-      setPosts((cur) =>
-        cur.map((x) =>
-          x.id === editingId
-            ? {
-                ...x,
-                body: editBody,
-                // optimistic local preview if user chose a new image
-                ...(editImage ? { image: URL.createObjectURL(editImage) } : {}),
-              }
-            : x
-        )
-      );
-    }
-
-    cancelEdit();
-    setSaving(false);
-  };
-
-  const handleDelete = async (id) => {
-    if (!window.confirm("Delete this post?")) return;
-    setDeletingId(id);
-    setErr("");
-
-    const headersVariants = getHeaderConfigs();
-    let success = false;
-
-    for (const cfg of headersVariants) {
-      try {
-        await axios.delete(`${POST_BASE}/${id}`, cfg);
-        success = true;
-        break;
-      } catch (e) {
-        // try next header variant
-      }
-    }
-
-    if (!success) {
-      setErr("Couldn’t delete the post. Check your token or try again.");
-      setDeletingId(null);
-      return;
-    }
-
-    setPosts((cur) => cur.filter((p) => p.id !== id));
-    setDeletingId(null);
-  };
-
+  /* ---------------- UI ---------------- */
   return (
     <div className="bg-teal-500 min-h-[85vh] flex flex-col items-center py-16">
       <div className="w-[92%] max-w-3xl">
-        <h1 className="text-4xl md:text-5xl font-bold text-white uppercase mb-6 text-center">
-          Posts
+        <h1 className="text-4xl md:text-5xl font-extrabold text-white uppercase mb-6 text-center">
+          My Posts
         </h1>
 
+        {!token && (
+          <div className="bg-red-100 text-red-700 p-3 rounded mb-4">
+            No user logged in.
+          </div>
+        )}
         {err && (
           <div className="bg-red-100 text-red-700 p-3 rounded mb-4">
             {err}
           </div>
         )}
 
-        {loading && posts.length === 0 ? (
+        {checkingUser ? (
+          <div className="text-white/90 text-center">Checking user…</div>
+        ) : loading && posts.length === 0 ? (
           <div className="text-white/90 text-center">Loading…</div>
         ) : posts.length === 0 ? (
           <div className="text-white/90 text-center">No posts yet.</div>
         ) : (
           <ul className="space-y-4">
-            {posts.map((p) => {
-              const isEditing = editingId === p.id;
-              return (
-                <li
-                  key={p.id}
-                  className="bg-white/95 rounded-xl shadow-md overflow-hidden"
-                >
-                  {p.image ? (
-                    <img
-                      src={p.image}
-                      alt={p.title}
-                      className="w-full max-h-72 object-cover"
-                      onError={(e) => (e.currentTarget.style.display = "none")}
-                    />
-                  ) : null}
-
-                  <div className="p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <h3 className="text-lg font-semibold text-gray-800">
-                        {p.title}
-                      </h3>
-                      {p.createdAt ? (
-                        <time
-                          className="text-xs text-gray-500"
-                          dateTime={new Date(p.createdAt).toISOString()}
-                        >
-                          {new Date(p.createdAt).toLocaleString()}
-                        </time>
-                      ) : null}
-                    </div>
-
-                    {/* Body / Edit form */}
-                    {!isEditing ? (
-                      p.body ? (
-                        <p className="mt-2 text-gray-700 whitespace-pre-line">
-                          {p.body}
-                        </p>
-                      ) : null
-                    ) : (
-                      <div className="mt-3 space-y-3">
-                        <label className="block text-sm font-medium text-gray-700">
-                          Body
-                        </label>
-                        <textarea
-                          value={editBody}
-                          onChange={(e) => setEditBody(e.target.value)}
-                          rows={4}
-                          className="w-full rounded-lg border border-gray-300 p-2 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                          placeholder="Write something…"
-                        />
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700">
-                            Replace Image (optional)
-                          </label>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) =>
-                              setEditImage(e.target.files?.[0] || null)
-                            }
-                            className="mt-1"
-                          />
-                        </div>
-                      </div>
+            {posts.map((p) => (
+              <li
+                key={p.id}
+                className="bg-white/95 rounded-xl shadow-md overflow-hidden"
+              >
+                {p.image && (
+                  <img
+                    src={p.image}
+                    alt="post"
+                    className="w-full max-h-72 object-cover"
+                    onError={(e) => (e.currentTarget.style.display = "none")}
+                  />
+                )}
+                <div className="p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-lg font-semibold text-gray-800">
+                      {p.author || "You"}
+                    </h3>
+                    {p.createdAt && (
+                      <time
+                        className="text-xs text-gray-500"
+                        dateTime={new Date(p.createdAt).toISOString()}
+                      >
+                        {new Date(p.createdAt).toLocaleString()}
+                      </time>
                     )}
-
-                    <div className="mt-4 flex items-center justify-between">
-                      <div className="text-sm text-gray-500">
-                        by <span className="font-medium">{p.author}</span>
-                      </div>
-
-                      {/* Actions */}
-                      {!isEditing ? (
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => startEdit(p)}
-                            className="px-3 py-1.5 rounded-lg bg-teal-600 text-white hover:bg-teal-700"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDelete(p.id)}
-                            disabled={deletingId === p.id}
-                            className={`px-3 py-1.5 rounded-lg ${
-                              deletingId === p.id
-                                ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                                : "bg-red-600 text-white hover:bg-red-700"
-                            }`}
-                          >
-                            {deletingId === p.id ? "Deleting…" : "Delete"}
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={saveEdit}
-                            disabled={saving}
-                            className={`px-3 py-1.5 rounded-lg ${
-                              saving
-                                ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                                : "bg-teal-600 text-white hover:bg-teal-700"
-                            }`}
-                          >
-                            {saving ? "Saving…" : "Save"}
-                          </button>
-                          <button
-                            onClick={cancelEdit}
-                            className="px-3 py-1.5 rounded-lg bg-gray-200 text-gray-800 hover:bg-gray-300"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      )}
-                    </div>
                   </div>
-                </li>
-              );
-            })}
+                  {p.body && (
+                    <p className="mt-2 text-gray-700 whitespace-pre-line">
+                      {p.body}
+                    </p>
+                  )}
+                </div>
+              </li>
+            ))}
           </ul>
         )}
 
         <div className="flex items-center justify-center mt-8">
           <button
-            disabled={!hasMore || loading}
+            disabled={!hasMore || loading || !userId}
             onClick={() => setPage((n) => n + 1)}
             className={`px-5 py-2 rounded-lg font-semibold shadow
               ${
-                hasMore
+                hasMore && userId
                   ? "bg-white text-teal-600 hover:bg-teal-700 hover:text-white"
                   : "bg-gray-300 text-gray-500 cursor-not-allowed"
-              }
-            `}
+              }`}
           >
             {loading && posts.length > 0
               ? "Loading…"

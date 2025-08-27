@@ -1,6 +1,7 @@
 // Home.jsx
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { toast } from "react-toastify";
 
 /* ---------------- avatar ---------------- */
 function InitialsAvatar({ name = "User", size = 40, src }) {
@@ -37,26 +38,29 @@ function InitialsAvatar({ name = "User", size = 40, src }) {
 
 /* ---------------- helpers ---------------- */
 const API = "https://linked-posts.routemisr.com";
+
+// client-side page size for COMMENTS only
 const PAGE_SIZE = 5;
 
+// server-side page size for POSTS
+const POSTS_LIMIT = 10;
+
+// read token
 const getToken = () => {
   try {
-    const raw =
-      localStorage.getItem("token") ||
-      localStorage.getItem("Token") ||
-      localStorage.getItem("userToken") ||
-      localStorage.getItem("authToken") ||
-      "";
-    return raw.trim().replace(/^"(.*)"$/, "$1") || null;
-  } catch {
-    return null;
-  }
+    const strip = (s) => (s ? s.replace(/^"(.*)"$/, "$1") : s);
+    for (const k of ["token", "Token", "userToken", "authToken"]) {
+      const v = strip(localStorage.getItem(k));
+      if (v && v !== "null" && v !== "undefined") return v;
+    }
+    const user = JSON.parse(localStorage.getItem("user") || "null");
+    if (user?.token) return user.token;
+    if (user?.data?.token) return user.data.token;
+  } catch {}
+  return null;
 };
 
-// exact header the API wants
 const authHeaders = (token) => (token ? { token } : {});
-
-// robust fallbacks used for PUT/DELETE (older working approach)
 const headerVariants = (token) =>
   token
     ? [
@@ -90,8 +94,9 @@ const normPost = (p = {}) => {
       (Array.isArray(p.images) && p.images.length ? p.images[0] : null),
     createdAt: p.createdAt || p.created_at || p.date || null,
     updatedAt: p.updatedAt || p.updated_at || null,
-    likes: p.likesCount || p.likes || 0,
-    commentsCount: Array.isArray(p.comments) ? p.comments.length : (p.commentsCount ?? 0),
+    commentsCount: Array.isArray(p.comments)
+      ? p.comments.length
+      : p.commentsCount ?? 0,
   };
 };
 
@@ -147,15 +152,80 @@ const logAxiosError = (label, err) => {
   }
 };
 
+// small helper to safely read pagination meta from API
+const getPostPagination = (data, limit, listLen) => {
+  const meta =
+    data?.paginationResult ||
+    data?.data?.paginationResult ||
+    data?.metadata ||
+    {};
+  const total = meta.total || data?.total || data?.data?.total || meta.count;
+  const totalPages =
+    meta.numberOfPages ||
+    meta.totalPages ||
+    data?.totalPages ||
+    data?.data?.totalPages ||
+    (typeof total === "number" && limit ? Math.max(1, Math.ceil(total / limit)) : undefined);
+
+  const current =
+    meta.currentPage ||
+    data?.page ||
+    data?.data?.page ||
+    meta.page ||
+    undefined;
+
+  // Fallback if API doesn't return totals: assume "more pages if list == limit"
+  const fallbackPages =
+    typeof totalPages === "number"
+      ? totalPages
+      : listLen === limit
+      ? (current || 1) + 1 // show at least next
+      : current || 1;
+
+  return {
+    page: current || 1,
+    totalPages: typeof totalPages === "number" ? totalPages : fallbackPages,
+  };
+};
+
+// build compact window like: Back [1] 2 3 4 5 … 25 Next
+const buildPageWindow = (page, total) => {
+  const nums = [];
+  const push = (x) => nums.push(x);
+  if (total <= 8) {
+    for (let i = 1; i <= total; i++) push(i);
+  } else {
+    const left = Math.max(2, page - 2);
+    const right = Math.min(total - 1, page + 2);
+    push(1);
+    if (left > 2) push("…");
+    for (let i = left; i <= right; i++) push(i);
+    if (right < total - 1) push("…");
+    push(total);
+  }
+  return nums;
+};
+
 /* ---------------- component ---------------- */
 export default function Home() {
   const [token, setToken] = useState(getToken());
   const isAuthed = !!token;
 
-  // who is logged in
-  const [me, setMe] = useState(null); // { id, name, avatar }
+  useEffect(() => {
+    if (token) {
+      axios.defaults.headers.common["token"] = token;
+      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+      axios.defaults.headers.common["Accept"] = "application/json";
+    } else {
+      delete axios.defaults.headers.common["token"];
+      delete axios.defaults.headers.common["Authorization"];
+    }
+  }, [token]);
 
-  // composer (new post)
+  // me
+  const [me, setMe] = useState(null);
+
+  // composer
   const [postText, setPostText] = useState("");
   const [imagePreview, setImagePreview] = useState(null);
   const [imageFile, setImageFile] = useState(null);
@@ -166,16 +236,17 @@ export default function Home() {
   const [loadingPosts, setLoadingPosts] = useState(true);
   const [err, setErr] = useState("");
 
-  // cached normalized comments per postId
-  const [commentsCache, setCommentsCache] = useState({});
+  // posts pagination
+  const [postPage, setPostPage] = useState(1);
+  const [postTotalPages, setPostTotalPages] = useState(1);
 
-  // UI state per post
-  // [postId]: { opened, loading, hasMore, page, all[], preview, input, posting, errorMsg, editingId, savingEdit }
-  const [cmap, setCmap] = useState({});
+  // comments cache + UI map
+  const [commentsCache, setCommentsCache] = useState({});
+  const [cmap, setCmap] = useState({}); // per post state
 
   useEffect(() => {
     const onStorage = (e) => {
-      if (["token", "Token", "userToken", "authToken"].includes(e.key)) {
+      if (["token", "Token", "userToken", "authToken", "user"].includes(e.key)) {
         setToken(getToken());
       }
     };
@@ -194,7 +265,7 @@ export default function Home() {
     }
   };
 
-  /* ---------- utility to repaint a page using a given array ---------- */
+  /* ---------- repaint one page from a given array (comments) ---------- */
   const PAGE = (postId, arr, page = 1, append = false) => {
     const start = (page - 1) * PAGE_SIZE;
     const slice = arr.slice(start, start + PAGE_SIZE);
@@ -216,7 +287,7 @@ export default function Home() {
     });
   };
 
-  /* ---------- FETCH ME ---------- */
+  /* ---------- me ---------- */
   const fetchMe = async () => {
     if (!token) { setMe(null); return; }
     try {
@@ -233,71 +304,82 @@ export default function Home() {
     }
   };
 
-  /* ---------- CREATE POST (multipart) + optimistic add + authoritative refresh ---------- */
+  /* ---------- CREATE POST ---------- */
   const handleCreatePost = async () => {
     if (!isAuthed) return alert("Please sign in first.");
     const text = postText.trim();
     if (!text && !imageFile) return;
 
     const form = new FormData();
-    form.append("body", text || "."); // API expects `body`
+    form.append("body", text || ".");
     if (imageFile) form.append("image", imageFile);
 
     setPostingPost(true);
     let created = null;
     try {
       const { data } = await axios.post(`${API}/posts`, form, {
-        headers: { ...authHeaders(token), "Content-Type": "multipart/form-data" },
+        headers: {
+          ...authHeaders(token),
+          "Content-Type": "multipart/form-data",
+          Accept: "application/json",
+        },
+        withCredentials: false,
       });
-      created = data?.post || data?.data?.post || data?.data || null;
+      created = data?.post || data?.data?.post || data?.data || data || null;
     } catch (e) {
       logAxiosError("Create post failed", e);
-    } finally {
-      setPostingPost(false);
+      const status = e?.response?.status;
+      const msg = (e?.response?.data?.message || "").toLowerCase();
+      if (status === 401 || msg.includes("login")) {
+        setErr("Your session is invalid or expired. Please log in again.");
+      } else {
+        setErr("Couldn't create the post. Please try again.");
+      }
     }
+    setPostingPost(false);
 
     if (!created) {
-      alert("Couldn't create the post. Please check your login and try again.");
+      toast.error("Couldn't create the post. Please try again.");
       return;
     }
 
-    // Clear composer UI
     setPostText("");
     setImageFile(null);
     setImagePreview(null);
 
-    // Optimistic add to show instantly
-    try {
-      const normalized = normPost(created);
-      const safe = {
-        ...normalized,
-        authorId: normalized.authorId || me?.id || null,
+    // push to top of current page when on page 1
+    if (postPage === 1) {
+      let p = normPost(created);
+      p = {
+        ...p,
+        authorId: p.authorId || me?.id || null,
         authorName:
-          normalized.authorName && normalized.authorName !== "Unknown"
-            ? normalized.authorName
+          p.authorName && p.authorName !== "Unknown"
+            ? p.authorName
             : (me?.name || "You"),
-        authorAvatar: normalized.authorAvatar ?? me?.avatar ?? null,
-        createdAt: normalized.createdAt || new Date().toISOString(),
-        commentsCount: normalized.commentsCount ?? 0,
+        authorAvatar: p.authorAvatar ?? me?.avatar ?? null,
+        createdAt: p.createdAt || new Date().toISOString(),
+        commentsCount: p.commentsCount ?? 0,
       };
-      setPosts((prev) => [safe, ...prev]);
-      setCommentsCache((prev) => ({ ...prev, [safe.id]: [] }));
-      setCmap((prev) => ({ ...prev, [safe.id]: { preview: null } }));
-    } catch {
-      /* ignore */
+      setPosts((prev) => [p, ...prev].slice(0, POSTS_LIMIT));
     }
 
-    // Authoritative refresh (guarantees it shows even if API enriches the record)
-    await fetchPosts();
+    toast.success("Post created!");
+    // re-fetch page 1 to align with server (and reset to first page)
+    setPostPage(1);
   };
 
-  /* ---------- FETCH POSTS ---------- */
-  const fetchPosts = async () => {
+  /* ---------- FETCH POSTS (server-side pagination) ---------- */
+  const fetchPosts = async (page = 1) => {
     setLoadingPosts(true);
     setErr("");
     try {
-      const { data } = await axios.get(`${API}/posts?page=1&limit=50`, { headers: authHeaders(token) });
-      const rawList = data?.posts || data?.data?.posts || data?.data || [];
+      const { data } = await axios.get(
+        `${API}/posts?page=${page}&limit=${POSTS_LIMIT}`,
+        { headers: authHeaders(token) }
+      );
+
+      const rawList = data?.posts || data?.data?.posts || data?.data || data?.results || [];
       const list = Array.isArray(rawList) ? rawList : [];
 
       const normalized = list
@@ -309,7 +391,7 @@ export default function Home() {
             (Date.parse(a.createdAt || a.updatedAt) || 0)
         );
 
-      // Build cache & previews from embedded comments
+      // comments cache + preview for those posts
       const cache = {};
       const previews = {};
       list.forEach((raw) => {
@@ -322,8 +404,13 @@ export default function Home() {
         previews[pid] = norm[0] || null;
       });
 
-      setCommentsCache(cache);
+      const { page: current, totalPages } = getPostPagination(data, POSTS_LIMIT, list.length);
+
+      setCommentsCache((prev) => ({ ...prev, ...cache }));
       setPosts(normalized);
+      setPostTotalPages(Math.max(1, totalPages || 1));
+      setPostPage(current || page);
+
       setCmap((prev) => {
         const next = { ...prev };
         normalized.forEach((p) => {
@@ -340,7 +427,31 @@ export default function Home() {
     }
   };
 
-  /* ---------- COMMENTS: cache-first pagination ---------- */
+  /* ---------- refresh comments page ---------- */
+  const refreshComments = async (postId, page = 1) => {
+    try {
+      const res = await axios.get(
+        `${API}/posts/${postId}/comments?limit=${PAGE_SIZE}&page=${page}`,
+        { headers: authHeaders(token) }
+      );
+      const arr = extractArray(res)
+        .map(normComment)
+        .sort((a, b) => (Date.parse(b.createdAt) || 0) - (Date.parse(a.createdAt) || 0));
+
+      setCommentsCache((prev) => {
+        PAGE(postId, arr, page, false);
+        return { ...prev, [postId]: arr };
+      });
+    } catch (e) {
+      logAxiosError("Refresh comments failed", e);
+      setCmap((prev) => ({
+        ...prev,
+        [postId]: { ...(prev[postId] || {}), errorMsg: "Couldn’t refresh comments." },
+      }));
+    }
+  };
+
+  /* ---------- comments: cache-first pagination ---------- */
   const loadFromCache = (postId, page, append) => {
     const all = commentsCache[postId] || [];
     PAGE(postId, all, page, append);
@@ -357,7 +468,10 @@ export default function Home() {
     if (used) return;
 
     try {
-      const res = await axios.get(`${API}/posts/${postId}/comments?limit=${PAGE_SIZE}&page=${page}`);
+      const res = await axios.get(
+        `${API}/posts/${postId}/comments?limit=${PAGE_SIZE}&page=${page}`,
+        { headers: authHeaders(token) }
+      );
       const arr = extractArray(res)
         .map(normComment)
         .sort((a, b) => (Date.parse(b.createdAt) || 0) - (Date.parse(a.createdAt) || 0));
@@ -396,7 +510,7 @@ export default function Home() {
     }
   };
 
-  /* ---------- START / CANCEL EDIT ---------- */
+  /* ---------- comment edit helpers ---------- */
   const startEditComment = (postId, comment) => {
     setCmap((prev) => ({
       ...prev,
@@ -421,7 +535,6 @@ export default function Home() {
     }));
   };
 
-  /* ---------- ADD / UPDATE COMMENT (uses your proven logic) ---------- */
   const submitComment = async (postId) => {
     const cur = cmap[postId] || {};
     const text = (cur.input || "").trim();
@@ -435,7 +548,6 @@ export default function Home() {
     }));
 
     if (editing) {
-      // UPDATE existing — try multiple header variants (old behavior)
       let ok = false;
       for (const headers of headerVariants(token)) {
         try {
@@ -457,9 +569,11 @@ export default function Home() {
           input: ok ? "" : cur.input,
         },
       }));
-      if (!ok) return;
+      if (!ok) {
+        toast.error("Couldn't update the comment.");
+        return;
+      }
 
-      // Update cache then repaint current page (reload AFTER set)
       setCommentsCache((prev) => {
         const updated = (prev[postId] || []).map((c) =>
           c.id === cur.editingId ? { ...c, text } : c
@@ -467,14 +581,23 @@ export default function Home() {
         PAGE(postId, updated, cur.page || 1, false);
         return { ...prev, [postId]: updated };
       });
+      toast.success("Comment updated.");
       return;
     }
 
-    // CREATE new (same as your code)
-    let success = false;
+    // create
+    let createdComment = null;
     try {
-      await axios.post(`${API}/comments`, { content: text, post: postId }, { headers: authHeaders(token) });
-      success = true;
+      const { data } = await axios.post(
+        `${API}/comments`,
+        { content: text, post: postId },
+        { headers: authHeaders(token) }
+      );
+      createdComment =
+        data?.comment ||
+        data?.data?.comment ||
+        (data?.data && (data.data._id || data.data.id) ? data.data : null) ||
+        (data && (data._id || data.id) ? data : null);
     } catch (e) {
       logAxiosError("Create comment failed", e);
     }
@@ -483,9 +606,23 @@ export default function Home() {
       ...prev,
       [postId]: { ...(prev[postId] || {}), posting: false },
     }));
-    if (!success) return;
 
-    // Optimistic prepend and repaint AFTER set
+    if (createdComment) {
+      const mine = normComment(createdComment);
+      setCommentsCache((prev) => {
+        const nextArr = [mine, ...(prev[postId] || [])];
+        PAGE(postId, nextArr, 1, false);
+        return { ...prev, [postId]: nextArr };
+      });
+      setCmap((prev) => ({
+        ...prev,
+        [postId]: { ...(prev[postId] || {}), input: "", opened: true },
+      }));
+      toast.success("Comment added.");
+      return;
+    }
+
+    // optimistic then sync
     setCommentsCache((prev) => {
       const curArr = prev[postId] || [];
       const mine = {
@@ -500,18 +637,17 @@ export default function Home() {
       PAGE(postId, nextArr, 1, false);
       return { ...prev, [postId]: nextArr };
     });
-
     setCmap((prev) => ({
       ...prev,
       [postId]: { ...(prev[postId] || {}), input: "", opened: true },
     }));
+    toast.success("Comment added.");
+    await refreshComments(postId, 1);
   };
 
-  /* ---------- DELETE COMMENT (uses your robust logic) ---------- */
   const deleteComment = async (postId, commentId) => {
     const cur = cmap[postId] || {};
 
-    // if it's a local optimistic id, just remove it client-side
     if (String(commentId).startsWith("local-")) {
       setCommentsCache((prev) => {
         const nextArr = (prev[postId] || []).filter((c) => c.id !== commentId);
@@ -526,41 +662,40 @@ export default function Home() {
       [postId]: { ...(prev[postId] || {}), savingEdit: true, errorMsg: "" },
     }));
 
-    // try token-only first (most consistent with this API), then fallbacks
     const tryDelete = async () => {
       try {
         await axios.delete(`${API}/comments/${commentId}`, { headers: { token } });
-        return true;
+        return { ok: true };
       } catch (e1) {
         logAxiosError("Delete (token) failed", e1);
         const status = e1?.response?.status || 0;
-
-        // Authorization fallback
         if (status === 401 || status === 403) {
           try {
             await axios.delete(`${API}/comments/${commentId}`, {
               headers: { Authorization: `Bearer ${token}` },
             });
-            return true;
+            return { ok: true };
           } catch (e2) {
             logAxiosError("Delete (Bearer) failed", e2);
+            if ((e2?.response?.status || 0) === 403) {
+              return { ok: false, forbidden: true };
+            }
           }
         }
-
-        // last resort: some deployments expect post id in query
         try {
-          await axios.delete(`${API}/comments/${commentId}?post=${encodeURIComponent(postId)}`, {
-            headers: { token },
-          });
-          return true;
+          await axios.delete(
+            `${API}/comments/${commentId}?post=${encodeURIComponent(postId)}`,
+            { headers: { token } }
+          );
+          return { ok: true };
         } catch (e3) {
           logAxiosError("Delete (with ?post=) failed", e3);
-          return false;
+          return { ok: false };
         }
       }
     };
 
-    const ok = await tryDelete();
+    const { ok, forbidden } = await tryDelete();
 
     setCmap((prev) => ({
       ...prev,
@@ -568,6 +703,11 @@ export default function Home() {
     }));
 
     if (!ok) {
+      if (forbidden) {
+        toast.error("You can only delete your own comments.");
+      } else {
+        toast.error("Couldn't delete the comment.");
+      }
       setCmap((prev) => ({
         ...prev,
         [postId]: {
@@ -583,22 +723,71 @@ export default function Home() {
       PAGE(postId, nextArr, cur.page || 1, false);
       return { ...prev, [postId]: nextArr };
     });
+    toast.success("Comment deleted.");
   };
 
   /* ---------- lifecycle ---------- */
   useEffect(() => {
     fetchMe();
-    fetchPosts();
+  }, [token]);
+
+  useEffect(() => {
+    fetchPosts(postPage);
     const onFocus = () => setToken(getToken());
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [token, postPage]);
 
-  /* ---------------- helpers: ownership (only allow mine) ---------------- */
   const canEditDelete = (comment) => {
     if (!me?.id) return false;
     return comment.authorId === me.id;
+    // NOTE: if API uses different author fields, adjust here.
+  };
+
+  /* ---------- posts pager UI ---------- */
+  const Pager = ({ page, total, onGo }) => {
+    if (total <= 1) return null;
+    const items = buildPageWindow(page, total);
+
+    return (
+      <div className="flex items-center gap-1 justify-center mt-6 select-none">
+        <button
+          onClick={() => onGo(Math.max(1, page - 1))}
+          disabled={page === 1}
+          className={`px-3 py-1 rounded ${page === 1 ? "bg-gray-700 text-gray-500" : "bg-gray-800 hover:bg-gray-700 text-gray-200"}`}
+        >
+          Back
+        </button>
+
+        {items.map((it, idx) =>
+          it === "…" ? (
+            <span key={`dots-${idx}`} className="px-2 text-gray-400">…</span>
+          ) : (
+            <button
+              key={it}
+              onClick={() => onGo(it)}
+              className={`w-8 h-8 rounded ${
+                it === page
+                  ? "bg-black text-white"
+                  : "bg-gray-800 hover:bg-gray-700 text-gray-200"
+              }`}
+              title={`Go to page ${it}`}
+            >
+              {it}
+            </button>
+          )
+        )}
+
+        <button
+          onClick={() => onGo(Math.min(total, page + 1))}
+          disabled={page === total}
+          className={`px-3 py-1 rounded ${page === total ? "bg-gray-700 text-gray-500" : "bg-gray-800 hover:bg-gray-700 text-gray-200"}`}
+        >
+          Next
+        </button>
+      </div>
+    );
   };
 
   /* ---------------- UI ---------------- */
@@ -646,7 +835,15 @@ export default function Home() {
 
       {/* Feed */}
       <div className="w-[90%] max-w-3xl mt-8 space-y-5">
-        <h4 className="text-gray-300 font-semibold">Latest Posts</h4>
+        <div className="flex items-center justify-between">
+          <h4 className="text-gray-300 font-semibold">Latest Posts</h4>
+          {/* quick page indicator */}
+          {postTotalPages > 1 && (
+            <span className="text-gray-400 text-sm">
+              Page {postPage} / {postTotalPages}
+            </span>
+          )}
+        </div>
 
         {err && <div className="bg-red-100 text-red-700 p-3 rounded">{err}</div>}
 
@@ -655,202 +852,210 @@ export default function Home() {
         ) : posts.length === 0 ? (
           <div className="text-gray-400">No posts yet.</div>
         ) : (
-          posts.map((p) => {
-            const s = cmap[p.id] || {};
-            const {
-              opened = false,
-              loading = false,
-              hasMore = false,
-              all = [],
-              preview = null,
-              input = "",
-              posting = false,
-              page = 1,
-              errorMsg = "",
-              editingId = null,
-              savingEdit = false,
-            } = s;
+          <>
+            {posts.map((p) => {
+              const s = cmap[p.id] || {};
+              const {
+                opened = false,
+                loading = false,
+                hasMore = false,
+                all = [],
+                preview = null,
+                input = "",
+                posting = false,
+                page = 1,
+                errorMsg = "",
+                editingId = null,
+                savingEdit = false,
+              } = s;
 
-            const when = p.createdAt || p.updatedAt;
+              const when = p.createdAt || p.updatedAt;
 
-            return (
-              <article key={p.id} className="bg-gray-800 rounded-xl shadow-md p-5">
-                {/* Header */}
-                <div className="flex items-center gap-3">
-                  <InitialsAvatar name={p.authorName} src={p.authorAvatar} size={44} />
-                  <div>
-                    <p className="text-white font-semibold">{p.authorName}</p>
-                    {when && (
-                      <time className="text-gray-400 text-xs" dateTime={new Date(when).toISOString()}>
-                        {new Date(when).toLocaleString()}
-                      </time>
-                    )}
-                  </div>
-                </div>
-
-                {/* Body */}
-                {p.content && <p className="text-gray-200 mt-3 whitespace-pre-line">{p.content}</p>}
-                {p.image && (
-                  <img
-                    src={p.image}
-                    alt="post"
-                    className="rounded-lg mt-3 max-h-[520px] w-full object-cover"
-                    onError={(e) => (e.currentTarget.style.display = "none")}
-                  />
-                )}
-
-                {/* Stats */}
-                <div className="flex items-center gap-6 text-gray-400 mt-4">
-                  <span className="inline-flex items-center gap-2" title="likes">
-                    <span role="img" aria-label="like">👍</span>
-                  </span>
-                  <span className="inline-flex items-center gap-2" title="comments">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16h6m2 4H7a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v12a2 2 0 01-2 2z" />
-                    </svg>
-                    <span>{p.commentsCount}</span>
-                  </span>
-                </div>
-
-                {/* Preview & open */}
-                {!opened && (
-                  <div className="mt-3 space-y-2">
-                    {preview && (
-                      <div className="bg-gray-700 rounded p-3 text-gray-100">
-                        <div className="flex items-center gap-3">
-                          <InitialsAvatar name={preview.authorName} src={preview.authorAvatar} size={28} />
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold">{preview.authorName}</span>
-                              {preview.createdAt && (
-                                <time className="text-xs text-gray-300">
-                                  {new Date(preview.createdAt).toLocaleString()}
-                                </time>
-                              )}
-                            </div>
-                            <div className="text-sm whitespace-pre-line mt-1">{preview.text}</div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    <button
-                      onClick={() => loadComments(p.id, 1, false)}
-                      className="text-blue-400 hover:underline text-sm"
-                      disabled={loading}
-                    >
-                      {loading ? "Loading comments…" : "Show comments"}
-                    </button>
-                    {errorMsg && <div className="text-red-400 text-xs mt-1">{errorMsg}</div>}
-                  </div>
-                )}
-
-                {/* Full comments */}
-                {opened && (
-                  <div className="mt-4 space-y-3">
-                    {all.length === 0 && !loading && (
-                      <div className="text-gray-400 text-sm">No comments yet.</div>
-                    )}
-
-                    {all.map((c) => (
-                      <div key={c.id} className="bg-gray-700 rounded p-3 text-gray-100">
-                        <div className="flex items-start gap-3">
-                          <InitialsAvatar name={c.authorName} src={c.authorAvatar} size={28} />
-
-                          {/* Comment content */}
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold">{c.authorName}</span>
-                              {c.createdAt && (
-                                <time className="text-xs text-gray-300">
-                                  {new Date(c.createdAt).toLocaleString()}
-                                </time>
-                              )}
-                            </div>
-                            <div className="text-sm whitespace-pre-line mt-1">{c.text}</div>
-                          </div>
-
-                          {/* Actions (only mine) */}
-                          {canEditDelete(c) && (
-                            <div className="flex items-center gap-2 self-start">
-                              <button
-                                title="Edit"
-                                className="p-1 rounded hover:bg-gray-600"
-                                onClick={() => startEditComment(p.id, c)}
-                                disabled={savingEdit || posting}
-                              >
-                                {/* Pencil */}
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M4 13.5V20h6.5l9.793-9.793a1 1 0 000-1.414l-3.086-3.086a1 1 0 00-1.414 0L4 13.5z" />
-                                </svg>
-                              </button>
-                              <button
-                                title="Delete"
-                                className="p-1 rounded hover:bg-gray-600"
-                                onClick={() => deleteComment(p.id, c.id)}
-                                disabled={savingEdit || posting}
-                              >
-                                {/* Trash */}
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5-3h4m-6 0h8m-9 3h10M9 11v6m6-6v6" />
-                                </svg>
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-
-                    {hasMore && (
-                      <button
-                        onClick={() => loadComments(p.id, (page || 1) + 1, true)}
-                        disabled={loading}
-                        className="text-blue-400 hover:underline text-sm"
-                      >
-                        {loading ? "Loading…" : "Load more"}
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {/* Add / Edit comment box */}
-                {isAuthed && (
-                  <div className="flex items-start gap-3 mt-4">
-                    <textarea
-                      className="flex-1 bg-gray-700 text-gray-100 rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder={editingId ? "Edit your comment..." : "Write a comment..."}
-                      rows={2}
-                      value={input || ""}
-                      onChange={(e) =>
-                        setCmap((prev) => ({
-                          ...prev,
-                          [p.id]: { ...(prev[p.id] || {}), input: e.target.value },
-                        }))
-                      }
-                      disabled={posting || savingEdit}
-                    />
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => submitComment(p.id)}
-                        disabled={(posting || savingEdit) || !(input || "").trim()}
-                        className={`${(posting || savingEdit) ? "bg-blue-400 cursor-wait" : "bg-blue-600 hover:bg-blue-700"} text-white font-semibold px-4 py-2 rounded-lg`}
-                      >
-                        {editingId ? (savingEdit ? "Saving…" : "Save") : (posting ? "Posting…" : "Comment")}
-                      </button>
-                      {editingId && (
-                        <button
-                          onClick={() => cancelEdit(p.id)}
-                          className="bg-gray-600 hover:bg-gray-700 text-white font-semibold px-3 py-2 rounded-lg"
-                          disabled={savingEdit}
-                        >
-                          Cancel
-                        </button>
+              return (
+                <article key={p.id} className="bg-gray-800 rounded-xl shadow-md p-5">
+                  {/* Header */}
+                  <div className="flex items-center gap-3">
+                    <InitialsAvatar name={p.authorName} src={p.authorAvatar} size={44} />
+                    <div>
+                      <p className="text-white font-semibold">{p.authorName}</p>
+                      {when && (
+                        <time className="text-gray-400 text-xs" dateTime={new Date(when).toISOString()}>
+                          {new Date(when).toLocaleString()}
+                        </time>
                       )}
                     </div>
                   </div>
-                )}
-              </article>
-            );
-          })
+
+                  {/* Body */}
+                  {p.content && <p className="text-gray-200 mt-3 whitespace-pre-line">{p.content}</p>}
+                  {p.image && (
+                    <img
+                      src={p.image}
+                      alt="post"
+                      className="rounded-lg mt-3 max-h-[520px] w-full object-cover"
+                      onError={(e) => (e.currentTarget.style.display = "none")}
+                    />
+                  )}
+
+                  {/* Stats */}
+                  <div className="flex items-center gap-6 text-gray-400 mt-4">
+                    <span className="inline-flex items-center gap-2" title="likes">
+                      <span role="img" aria-label="like">👍</span>
+                    </span>
+                    <span className="inline-flex items-center gap-2" title="comments">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16h6m2 4H7a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v12a2 2 0 01-2 2z" />
+                      </svg>
+                      <span>{p.commentsCount}</span>
+                    </span>
+                  </div>
+
+                  {/* Preview & open */}
+                  {!opened && (
+                    <div className="mt-3 space-y-2">
+                      {preview && (
+                        <div className="bg-gray-700 rounded p-3 text-gray-100">
+                          <div className="flex items-center gap-3">
+                            <InitialsAvatar name={preview.authorName} src={preview.authorAvatar} size={28} />
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold">{preview.authorName}</span>
+                                {preview.createdAt && (
+                                  <time className="text-xs text-gray-300">
+                                    {new Date(preview.createdAt).toLocaleString()}
+                                  </time>
+                                )}
+                              </div>
+                              <div className="text-sm whitespace-pre-line mt-1">{preview.text}</div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      <button
+                        onClick={() => loadComments(p.id, 1, false)}
+                        className="text-blue-400 hover:underline text-sm"
+                        disabled={loading}
+                      >
+                        {loading ? "Loading comments…" : "Show comments"}
+                      </button>
+                      {errorMsg && <div className="text-red-400 text-xs mt-1">{errorMsg}</div>}
+                    </div>
+                  )}
+
+                  {/* Full comments */}
+                  {opened && (
+                    <div className="mt-4 space-y-3">
+                      {all.length === 0 && !loading && (
+                        <div className="text-gray-400 text-sm">No comments yet.</div>
+                      )}
+
+                      {all.map((c) => (
+                        <div key={c.id} className="bg-gray-700 rounded p-3 text-gray-100">
+                          <div className="flex items-start gap-3">
+                            <InitialsAvatar name={c.authorName} src={c.authorAvatar} size={28} />
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold">{c.authorName}</span>
+                                {c.createdAt && (
+                                  <time className="text-xs text-gray-300">
+                                    {new Date(c.createdAt).toLocaleString()}
+                                  </time>
+                                )}
+                              </div>
+                              <div className="text-sm whitespace-pre-line mt-1">{c.text}</div>
+                            </div>
+
+                            {/* Actions (only mine) */}
+                            {canEditDelete(c) && (
+                              <div className="flex items-center gap-2 self-start">
+                                <button
+                                  title="Edit"
+                                  className="p-1 rounded hover:bg-gray-600"
+                                  onClick={() => startEditComment(p.id, c)}
+                                  disabled={savingEdit || posting}
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M4 13.5V20h6.5l9.793-9.793a1 1 0 000-1.414l-3.086-3.086a1 1 0 00-1.414 0L4 13.5z" />
+                                  </svg>
+                                </button>
+                                <button
+                                  title="Delete"
+                                  className="p-1 rounded hover:bg-gray-600"
+                                  onClick={() => deleteComment(p.id, c.id)}
+                                  disabled={savingEdit || posting}
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5-3h4m-6 0h8m-9 3h10M9 11v6m6-6v6" />
+                                  </svg>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+
+                      {hasMore && (
+                        <button
+                          onClick={() => loadComments(p.id, (page || 1) + 1, true)}
+                          disabled={loading}
+                          className="text-blue-400 hover:underline text-sm"
+                        >
+                          {loading ? "Loading…" : "Load more"}
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Add / Edit comment box */}
+                  {isAuthed && (
+                    <div className="flex items-start gap-3 mt-4">
+                      <textarea
+                        className="flex-1 bg-gray-700 text-gray-100 rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder={editingId ? "Edit your comment..." : "Write a comment..."}
+                        rows={2}
+                        value={input || ""}
+                        onChange={(e) =>
+                          setCmap((prev) => ({
+                            ...prev,
+                            [p.id]: { ...(prev[p.id] || {}), input: e.target.value },
+                          }))
+                        }
+                        disabled={posting || savingEdit}
+                      />
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => submitComment(p.id)}
+                          disabled={(posting || savingEdit) || !(input || "").trim()}
+                          className={`${(posting || savingEdit) ? "bg-blue-400 cursor-wait" : "bg-blue-600 hover:bg-blue-700"} text-white font-semibold px-4 py-2 rounded-lg`}
+                        >
+                          {editingId ? (savingEdit ? "Saving…" : "Save") : (posting ? "Posting…" : "Comment")}
+                        </button>
+                        {editingId && (
+                          <button
+                            onClick={() => cancelEdit(p.id)}
+                            className="bg-gray-600 hover:bg-gray-700 text-white font-semibold px-3 py-2 rounded-lg"
+                            disabled={savingEdit}
+                          >
+                            Cancel
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </article>
+              );
+            })}
+
+            {/* POSTS PAGER */}
+            <Pager
+              page={postPage}
+              total={postTotalPages}
+              onGo={(p) => {
+                if (p !== postPage) setPostPage(p);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+            />
+          </>
         )}
       </div>
     </div>

@@ -7,7 +7,7 @@ const AVATAR = (name = "User") =>
 
 const normalizeUser = (raw = {}) => {
   const first = raw.firstName || raw.first_name;
-  const last  = raw.lastName  || raw.last_name;
+  const last = raw.lastName || raw.last_name;
 
   const name =
     raw.name ||
@@ -32,6 +32,7 @@ export default function Profile() {
   const [user, setUser] = useState(null);
   const [fetching, setFetching] = useState(true);
   const [err, setErr] = useState("");
+  const [uploading, setUploading] = useState(false);
 
   const fetchProfile = async () => {
     const token = localStorage.getItem("token");
@@ -45,7 +46,6 @@ export default function Profile() {
     setFetching(true);
     setErr("");
 
-    // Try common header formats against the required endpoint
     const url = "https://linked-posts.routemisr.com/users/profile-data";
     const headersList = [
       { Authorization: `Bearer ${token}` },
@@ -56,22 +56,58 @@ export default function Profile() {
     for (const headers of headersList) {
       try {
         const { data } = await axios.get(url, { headers });
-        const raw =
-          data?.data?.user || data?.user || data?.data || data || {};
+        const raw = data?.data?.user || data?.user || data?.data || data || {};
         const merged = normalizeUser(raw);
         setUser(merged);
         setFetching(false);
         return;
       } catch (e) {
-        // if 401/403, no need to keep trying other headers if this one already used Bearer
-        if (e?.response?.status === 401 || e?.response?.status === 403) {
-          // continue to try the next header variant; if all fail we'll set a session error
-        }
+        // try next header format
       }
     }
 
     setFetching(false);
     setErr("Couldn’t fetch profile from server. Please try again.");
+  };
+
+  // Upload profile photo -> PUT /users/upload-photo (multipart/form-data, header: token)
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const token = localStorage.getItem("token");
+    if (!token) {
+      alert("Please login first.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("photo", file);
+
+    try {
+      setUploading(true);
+      await axios.put(
+        "https://linked-posts.routemisr.com/users/upload-photo",
+        formData,
+        {
+          headers: {
+            token: token, // required by this API
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+      await fetchProfile(); // refresh avatar after upload
+    } catch (error) {
+      console.error("Upload failed", error);
+      const msg =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Upload failed. Please try again.";
+      alert(msg);
+    } finally {
+      setUploading(false);
+      e.target.value = ""; // reset input
+    }
   };
 
   useEffect(() => {
@@ -119,22 +155,32 @@ export default function Profile() {
           PROFILE
         </h1>
 
-        {/* Avatar + status */}
+        {/* Avatar + status + uploader */}
         <div className="flex flex-col items-center gap-3 mb-8">
-          <div className="relative">
-            <img
-              src={user.avatar || AVATAR(user.name)}
-              alt="avatar"
-              className="w-28 h-28 rounded-full ring-4 ring-white shadow-md object-cover"
-              onError={(e) => (e.currentTarget.src = AVATAR(user.name))}
+          <img
+            src={user.avatar || AVATAR(user.name)}
+            alt="avatar"
+            className="w-28 h-28 rounded-full ring-4 ring-white shadow-md object-cover"
+            onError={(e) => (e.currentTarget.src = AVATAR(user.name))}
+          />
+
+          <label className="bg-white text-teal-600 px-4 py-2 rounded-lg cursor-pointer hover:bg-teal-600 hover:text-white transition">
+            {uploading ? "Uploading…" : "Change Photo"}
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handlePhotoUpload}
+              disabled={uploading}
             />
-          </div>
+          </label>
+
           <div className="text-white/90 text-sm">
             {fetching ? "Refreshing from server…" : err ? err : ""}
           </div>
         </div>
 
-        {/* Info fields */}
+        {/* Info fields (all preserved) */}
         <div className="grid grid-cols-1 gap-4">
           <div>
             <label className="block text-white font-semibold mb-1">Name</label>
