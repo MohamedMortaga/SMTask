@@ -45,8 +45,11 @@ function InitialsAvatar({ name = "User", size = 40, src }) {
 
 /* ---------------- helpers ---------------- */
 const API = "https://linked-posts.routemisr.com";
-const PAGE_SIZE = 5;       // comments page size (client side only)
-const POSTS_LIMIT = 6;     // posts page size (server side)
+const PAGE_SIZE = 5; // comments page size (client side only)
+const POSTS_LIMIT = 6; // posts page size (server side)
+
+/** 🔁 Auto-refresh cadence (change to 86_400_000 for once per day) */
+const AUTO_REFRESH_MS = 60_000; // 1 minute
 
 const getToken = () => {
   try {
@@ -191,7 +194,7 @@ const buildPageWindow = (page, total) => {
 /* ---------- memoized inline comments panel (outside Home) ---------- */
 const InlineComments = memo(function InlineComments({
   postId,
-  openedInline,            // ← visible state is passed in
+  openedInline, // ← visible state is passed in
   cmap,
   setCmap,
   isAuthed,
@@ -246,14 +249,25 @@ const InlineComments = memo(function InlineComments({
 
       <div className="max-h-[360px] overflow-auto p-3 space-y-3">
         {loading ? (
-          <div className="dark:text-gray-300 light:text-gray-600">Loading comments…</div>
+          <div className="dark:text-gray-300 light:text-gray-600">
+            Loading comments…
+          </div>
         ) : all.length === 0 ? (
-          <div className="dark:text-gray-400 light:text-gray-500">No comments yet.</div>
+          <div className="dark:text-gray-400 light:text-gray-500">
+            No comments yet.
+          </div>
         ) : (
           all.map((c) => (
-                         <div key={c.id} className="dark:bg-gray-700 light:bg-white rounded p-3 dark:text-gray-100 light:text-gray-800 border light:border-gray-200 shadow-sm">
+            <div
+              key={c.id}
+              className="dark:bg-gray-700 light:bg-white rounded p-3 dark:text-gray-100 light:text-gray-800 border light:border-gray-200 shadow-sm"
+            >
               <div className="flex items-start gap-3">
-                <InitialsAvatar name={c.authorName} src={c.authorAvatar} size={28} />
+                <InitialsAvatar
+                  name={c.authorName}
+                  src={c.authorAvatar}
+                  size={28}
+                />
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <span className="font-semibold">{c.authorName}</span>
@@ -263,7 +277,9 @@ const InlineComments = memo(function InlineComments({
                       </time>
                     )}
                   </div>
-                  <div className="text-sm whitespace-pre-line mt-1">{c.text}</div>
+                  <div className="text-sm whitespace-pre-line mt-1">
+                    {c.text}
+                  </div>
                 </div>
                 {canEditDelete(c) && (
                   <div className="flex items-center gap-2 self-start">
@@ -273,7 +289,11 @@ const InlineComments = memo(function InlineComments({
                       onClick={() =>
                         setCmap((prev) => ({
                           ...prev,
-                          [postId]: { ...(prev[postId] || {}), editingId: c.id, input: c.text },
+                          [postId]: {
+                            ...(prev[postId] || {}),
+                            editingId: c.id,
+                            input: c.text,
+                          },
                         }))
                       }
                       disabled={savingEdit || posting}
@@ -328,10 +348,20 @@ const InlineComments = memo(function InlineComments({
           <div className="flex items-center gap-2 mt-2">
             <button
               onClick={() => submitComment(postId)}
-              disabled={(posting || savingEdit) || !(input || "").trim()}
-              className={`${(posting || savingEdit) ? "bg-blue-400 cursor-wait" : "bg-blue-600 hover:bg-blue-700"} text-white font-semibold px-4 py-2 rounded-lg`}
+              disabled={posting || savingEdit || !(input || "").trim()}
+              className={`${
+                posting || savingEdit
+                  ? "bg-blue-400 cursor-wait"
+                  : "bg-blue-600 hover:bg-blue-700"
+              } text-white font-semibold px-4 py-2 rounded-lg`}
             >
-              {editingId ? (savingEdit ? "Saving…" : "Save") : (posting ? "Posting…" : "Comment")}
+              {editingId
+                ? savingEdit
+                  ? "Saving…"
+                  : "Save"
+                : posting
+                ? "Posting…"
+                : "Comment"}
             </button>
             {editingId && (
               <button
@@ -359,14 +389,23 @@ function Pager({ page, total, onGo }) {
       <button
         onClick={() => onGo(Math.max(1, page - 1))}
         disabled={page === 1}
-        className={`px-3 py-1 rounded ${page === 1 ? "dark:bg-gray-700 light:bg-gray-300 dark:text-gray-500 light:text-gray-400" : "dark:bg-gray-800 light:bg-gray-200 hover:dark:bg-gray-700 hover:light:bg-gray-300 dark:text-gray-200 light:text-gray-700"}`}
+        className={`px-3 py-1 rounded ${
+          page === 1
+            ? "dark:bg-gray-700 light:bg-gray-300 dark:text-gray-500 light:text-gray-400"
+            : "dark:bg-gray-800 light:bg-gray-200 hover:dark:bg-gray-700 hover:light:bg-gray-300 dark:text-gray-200 light:text-gray-700"
+        }`}
       >
         Back
       </button>
 
       {items.map((it, idx) =>
         it === "…" ? (
-          <span key={`dots-${idx}`} className="px-2 dark:text-gray-400 light:text-gray-500">…</span>
+          <span
+            key={`dots-${idx}`}
+            className="px-2 dark:text-gray-400 light:text-gray-500"
+          >
+            …
+          </span>
         ) : (
           <button
             key={it}
@@ -386,7 +425,11 @@ function Pager({ page, total, onGo }) {
       <button
         onClick={() => onGo(Math.min(total, page + 1))}
         disabled={page === total}
-        className={`px-3 py-1 rounded ${page === total ? "dark:bg-gray-700 light:bg-gray-300 dark:text-gray-500 light:text-gray-400" : "dark:bg-gray-800 light:bg-gray-200 hover:dark:bg-gray-700 hover:light:bg-gray-300 dark:text-gray-200 light:text-gray-700"}`}
+        className={`px-3 py-1 rounded ${
+          page === total
+            ? "dark:bg-gray-700 light:bg-gray-300 dark:text-gray-500 light:text-gray-400"
+            : "dark:bg-gray-800 light:bg-gray-200 hover:dark:bg-gray-700 hover:light:bg-gray-300 dark:text-gray-200 light:text-gray-700"
+        }`}
       >
         Next
       </button>
@@ -437,46 +480,58 @@ function PostModal({
   const post = m.post || posts.find((p) => p.id === pid);
 
   return (
-              <div
-       className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
-       onMouseDown={onBackdropMouseDown}
-     >
-       <div
-         className="bg-gray-900 rounded-2xl shadow-xl w-full max-w-6xl h-[100vh] overflow-hidden grid grid-cols-1 lg:grid-cols-[1fr_380px]"
-         onMouseDown={(e) => e.stopPropagation()}
-         role="dialog"
-         aria-modal="true"
-       >
-         {/* Left: post */}
-         <div className="relative h-full overflow-auto bg-gray-900">
-                     {m.loading ? (
-             <div className="h-full flex items-center justify-center text-gray-300">Loading post…</div>
-           ) : !post ? (
-             <div className="h-full flex items-center justify-center text-gray-400">Post not found.</div>
-           ) : (
-             <div className="p-5">
-               <div className="flex items-center gap-3">
-                 <InitialsAvatar name={post.authorName} src={post.authorAvatar} size={46} />
-                 <div>
-                   <p className="text-white font-semibold">{post.authorName}</p>
-                   {(post.createdAt || post.updatedAt) && (
-                     <time className="text-gray-400 text-xs">
-                       {new Date(post.createdAt || post.updatedAt).toLocaleString()}
-                     </time>
-                   )}
-                 </div>
-               </div>
-               {post.content && (
-                 <p className="text-gray-200 mt-4 whitespace-pre-line">{post.content}</p>
-               )}
-                             {post.image && (
-                 <img
-                   src={post.image}
-                   alt="post"
-                   className="rounded-xl mt-4 max-h-[60vh] w-full object-contain bg-black/20"
-                   onError={(e) => (e.currentTarget.style.display = "none")}
-                 />
-               )}
+    <div
+      className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+      onMouseDown={onBackdropMouseDown}
+    >
+      <div
+        className="bg-gray-900 rounded-2xl shadow-xl w-full max-w-6xl h-[100vh] overflow-hidden grid grid-cols-1 lg:grid-cols-[1fr_380px]"
+        onMouseDown={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+      >
+        {/* Left: post */}
+        <div className="relative h-full overflow-auto bg-gray-900">
+          {m.loading ? (
+            <div className="h-full flex items-center justify-center text-gray-300">
+              Loading post…
+            </div>
+          ) : !post ? (
+            <div className="h-full flex items-center justify-center text-gray-400">
+              Post not found.
+            </div>
+          ) : (
+            <div className="p-5">
+              <div className="flex items-center gap-3">
+                <InitialsAvatar
+                  name={post.authorName}
+                  src={post.authorAvatar}
+                  size={46}
+                />
+                <div>
+                  <p className="text-white font-semibold">{post.authorName}</p>
+                  {(post.createdAt || post.updatedAt) && (
+                    <time className="text-gray-400 text-xs">
+                      {new Date(
+                        post.createdAt || post.updatedAt
+                      ).toLocaleString()}
+                    </time>
+                  )}
+                </div>
+              </div>
+              {post.content && (
+                <p className="text-gray-200 mt-4 whitespace-pre-line">
+                  {post.content}
+                </p>
+              )}
+              {post.image && (
+                <img
+                  src={post.image}
+                  alt="post"
+                  className="rounded-xl mt-4 max-h-[60vh] w-full object-contain bg-black/20"
+                  onError={(e) => (e.currentTarget.style.display = "none")}
+                />
+              )}
             </div>
           )}
           <button
@@ -488,58 +543,71 @@ function PostModal({
           </button>
         </div>
 
-                 {/* Right: comments */}
-         <aside className="h-full bg-gray-800 border-l border-gray-700 flex flex-col">
-           <div className="px-4 py-3 border-b border-gray-700 text-gray-200 font-semibold">
-             Comments
-           </div>
+        {/* Right: comments */}
+        <aside className="h-full bg-gray-800 border-l border-gray-700 flex flex-col">
+          <div className="px-4 py-3 border-b border-gray-700 text-gray-200 font-semibold">
+            Comments
+          </div>
 
-           <div className="flex-1 overflow-auto p-3 space-y-1">
-             {loading ? (
-               <div className="text-gray-300">Loading comments…</div>
-             ) : all.length === 0 ? (
-               <div className="text-gray-400">No comments yet.</div>
-             ) : (
-               all.map((c) => (
-                 <div key={c.id} className="bg-gray-700 rounded-xl p-3 text-gray-100 border border-gray-600 shadow-sm">
-                                       <div className="flex items-start gap-3">
-                       <InitialsAvatar name={c.authorName} src={c.authorAvatar} size={28} />
-                       <div className="flex-1">
-                         <div className="flex items-center gap-2">
-                           <span className="font-semibold">{c.authorName}</span>
-                           {c.createdAt && (
-                             <time className="text-xs text-gray-300">
-                               {new Date(c.createdAt).toLocaleString()}
-                             </time>
-                           )}
-                         </div>
-                         <div className="text-sm whitespace-pre-line mt-1">{c.text}</div>
-                       </div>
-                                         {canEditDelete(c) && (
-                       <div className="flex items-center gap-2 self-start">
-                         <button
-                           title="Edit"
-                           className="p-1 rounded hover:bg-gray-600 transition-colors"
-                           onClick={() =>
-                             setCmap((prev) => ({
-                               ...prev,
-                               [pid]: { ...(prev[pid] || {}), editingId: c.id, input: c.text },
-                             }))
-                           }
-                           disabled={savingEdit || posting}
-                         >
-                           ✎
-                         </button>
-                         <button
-                           title="Delete"
-                           className="p-1 rounded hover:bg-gray-600 transition-colors"
-                           onClick={() => deleteComment(pid, c.id)}
-                           disabled={savingEdit || posting}
-                         >
-                           🗑
-                         </button>
-                       </div>
-                     )}
+          <div className="flex-1 overflow-auto p-3 space-y-1">
+            {loading ? (
+              <div className="text-gray-300">Loading comments…</div>
+            ) : all.length === 0 ? (
+              <div className="text-gray-400">No comments yet.</div>
+            ) : (
+              all.map((c) => (
+                <div
+                  key={c.id}
+                  className="bg-gray-700 rounded-xl p-3 text-gray-100 border border-gray-600 shadow-sm"
+                >
+                  <div className="flex items-start gap-3">
+                    <InitialsAvatar
+                      name={c.authorName}
+                      src={c.authorAvatar}
+                      size={28}
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold">{c.authorName}</span>
+                        {c.createdAt && (
+                          <time className="text-xs text-gray-300">
+                            {new Date(c.createdAt).toLocaleString()}
+                          </time>
+                        )}
+                      </div>
+                      <div className="text-sm whitespace-pre-line mt-1">
+                        {c.text}
+                      </div>
+                    </div>
+                    {canEditDelete(c) && (
+                      <div className="flex items-center gap-2 self-start">
+                        <button
+                          title="Edit"
+                          className="p-1 rounded hover:bg-gray-600 transition-colors"
+                          onClick={() =>
+                            setCmap((prev) => ({
+                              ...prev,
+                              [pid]: {
+                                ...(prev[pid] || {}),
+                                editingId: c.id,
+                                input: c.text,
+                              },
+                            }))
+                          }
+                          disabled={savingEdit || posting}
+                        >
+                          ✎
+                        </button>
+                        <button
+                          title="Delete"
+                          className="p-1 rounded hover:bg-gray-600 transition-colors"
+                          onClick={() => deleteComment(pid, c.id)}
+                          disabled={savingEdit || posting}
+                        >
+                          🗑
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))
@@ -556,29 +624,39 @@ function PostModal({
             )}
           </div>
 
-                     {isAuthed && (
-             <div className="p-3 border-t border-gray-700">
-               <textarea
-                 ref={inputRef}
-                 className="w-full bg-gray-700 text-gray-100 rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-600"
-                 placeholder={editingId ? "Edit your comment..." : "Write a comment..."}
-                 rows={2}
-                 value={input || ""}
-                 onChange={(e) =>
-                   setCmap((prev) => ({
-                     ...prev,
-                     [pid]: { ...(prev[pid] || {}), input: e.target.value },
-                   }))
-                 }
-                 disabled={posting || savingEdit}
-               />
+          {isAuthed && (
+            <div className="p-3 border-t border-gray-700">
+              <textarea
+                ref={inputRef}
+                className="w-full bg-gray-700 text-gray-100 rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-600"
+                placeholder={editingId ? "Edit your comment..." : "Write a comment..."}
+                rows={2}
+                value={input || ""}
+                onChange={(e) =>
+                  setCmap((prev) => ({
+                    ...prev,
+                    [pid]: { ...(prev[pid] || {}), input: e.target.value },
+                  }))
+                }
+                disabled={posting || savingEdit}
+              />
               <div className="flex items-center gap-2 mt-2">
                 <button
                   onClick={() => submitComment(pid)}
-                  disabled={(posting || savingEdit) || !(input || "").trim()}
-                  className={`${(posting || savingEdit) ? "bg-blue-400 cursor-wait" : "bg-blue-600 hover:bg-blue-700"} text-white font-semibold px-4 py-2 rounded-lg`}
+                  disabled={posting || savingEdit || !(input || "").trim()}
+                  className={`${
+                    posting || savingEdit
+                      ? "bg-blue-400 cursor-wait"
+                      : "bg-blue-600 hover:bg-blue-700"
+                  } text-white font-semibold px-4 py-2 rounded-lg`}
                 >
-                  {editingId ? (savingEdit ? "Saving…" : "Save") : (posting ? "Posting…" : "Comment")}
+                  {editingId
+                    ? savingEdit
+                      ? "Saving…"
+                      : "Save"
+                    : posting
+                    ? "Posting…"
+                    : "Comment"}
                 </button>
                 {editingId && (
                   <button
@@ -636,7 +714,9 @@ export default function Home() {
   const [commentsCache, setCommentsCache] = useState({});
   const [cmap, setCmap] = useState({});
   const cmapRef = useRef(cmap);
-  useEffect(() => { cmapRef.current = cmap; }, [cmap]);
+  useEffect(() => {
+    cmapRef.current = cmap;
+  }, [cmap]);
 
   // modal
   const [modal, setModal] = useState({
@@ -673,7 +753,7 @@ export default function Home() {
     const slice = arr.slice(start, start + PAGE_SIZE);
     setCmap((prev) => {
       const cur = prev[postId] || {};
-      const combined = append ? [ ...(cur.all || []), ...slice ] : slice;
+      const combined = append ? [...(cur.all || []), ...slice] : slice;
       return {
         ...prev,
         [postId]: {
@@ -691,13 +771,23 @@ export default function Home() {
 
   /* ---------- me ---------- */
   const fetchMe = async () => {
-    if (!token) { setMe(null); return; }
+    if (!token) {
+      setMe(null);
+      return;
+    }
     try {
-      const { data } = await axios.get(`${API}/users/profile-data`, { headers: authHeaders(token) });
+      const { data } = await axios.get(`${API}/users/profile-data`, {
+        headers: authHeaders(token),
+      });
       const u = data?.user || data?.data || data || {};
       setMe({
         id: u._id || u.id || null,
-        name: u.name || u.fullName || u.username || u.email?.split("@")[0] || "You",
+        name:
+          u.name ||
+          u.fullName ||
+          u.username ||
+          u.email?.split("@")[0] ||
+          "You",
         avatar: u.photo || u.avatar || u.image || null,
       });
     } catch (e) {
@@ -727,7 +817,8 @@ export default function Home() {
         },
         withCredentials: false,
       });
-      created = data?.post || data?.data?.post || data?.data || data || null;
+      created =
+        data?.post || data?.data?.post || data?.data || data || null;
     } catch (e) {
       logAxiosError("Create post failed", e);
       const status = e?.response?.status;
@@ -757,7 +848,7 @@ export default function Home() {
         authorName:
           p.authorName && p.authorName !== "Unknown"
             ? p.authorName
-            : (me?.name || "You"),
+            : me?.name || "You",
         authorAvatar: p.authorAvatar ?? me?.avatar ?? null,
         createdAt: p.createdAt || new Date().toISOString(),
         commentsCount: p.commentsCount ?? 0,
@@ -780,7 +871,8 @@ export default function Home() {
         { headers: authHeaders(token) }
       );
 
-      const rawList = data?.posts || data?.data?.posts || data?.data || data?.results || [];
+      const rawList =
+        data?.posts || data?.data?.posts || data?.data || data?.results || [];
       const list = Array.isArray(rawList) ? rawList : [];
 
       const normalized = list
@@ -799,7 +891,11 @@ export default function Home() {
         const rc = Array.isArray(raw?.comments) ? raw.comments : [];
         const norm = rc
           .map(normComment)
-          .sort((a, b) => (Date.parse(b.createdAt) || 0) - (Date.parse(a.createdAt) || 0));
+          .sort(
+            (a, b) =>
+              (Date.parse(b.createdAt) || 0) -
+              (Date.parse(a.createdAt) || 0)
+          );
         cache[pid] = norm;
         previews[pid] = norm[0] || null;
       });
@@ -842,7 +938,11 @@ export default function Home() {
       });
       const arr = extractArray(res)
         .map(normComment)
-        .sort((a, b) => (Date.parse(b.createdAt) || 0) - (Date.parse(a.createdAt) || 0));
+        .sort(
+          (a, b) =>
+            (Date.parse(b.createdAt) || 0) -
+            (Date.parse(a.createdAt) || 0)
+        );
 
       setCommentsCache((prev) => ({ ...prev, [postId]: arr }));
       return arr;
@@ -880,7 +980,11 @@ export default function Home() {
       });
       const arr = extractArray(res)
         .map(normComment)
-        .sort((a, b) => (Date.parse(b.createdAt) || 0) - (Date.parse(a.createdAt) || 0));
+        .sort(
+          (a, b) =>
+            (Date.parse(b.createdAt) || 0) -
+            (Date.parse(a.createdAt) || 0)
+        );
 
       setCommentsCache((prev) => {
         PAGE(postId, arr, page, false);
@@ -890,7 +994,10 @@ export default function Home() {
       logAxiosError("Refresh comments failed", e);
       setCmap((prev) => ({
         ...prev,
-        [postId]: { ...(prev[postId] || {}), errorMsg: "Couldn’t refresh comments." },
+        [postId]: {
+          ...(prev[postId] || {}),
+          errorMsg: "Couldn’t refresh comments.",
+        },
       }));
     }
   };
@@ -916,13 +1023,22 @@ export default function Home() {
 
     setCmap((prev) => ({
       ...prev,
-      [postId]: { ...(prev[postId] || {}), posting: !editing, savingEdit: editing, opened: true },
+      [postId]: {
+        ...(prev[postId] || {}),
+        posting: !editing,
+        savingEdit: editing,
+        opened: true,
+      },
     }));
 
     if (editing) {
       let ok = false;
       try {
-        await axios.put(`${API}/comments/${cur.editingId}`, { content: text }, { headers: authHeaders(token) });
+        await axios.put(
+          `${API}/comments/${cur.editingId}`,
+          { content: text },
+          { headers: authHeaders(token) }
+        );
         ok = true;
       } catch (e) {
         logAxiosError("Update comment failed", e);
@@ -987,6 +1103,12 @@ export default function Home() {
         ...prev,
         [postId]: { ...(prev[postId] || {}), input: "", opened: true },
       }));
+      // optional: bump visible counter
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.id === postId ? { ...p, commentsCount: (p.commentsCount || 0) + 1 } : p
+        )
+      );
       toast.success("Comment added.");
       return;
     }
@@ -1010,6 +1132,11 @@ export default function Home() {
       ...prev,
       [postId]: { ...(prev[postId] || {}), input: "", opened: true },
     }));
+    setPosts((prev) =>
+      prev.map((p) =>
+        p.id === postId ? { ...p, commentsCount: (p.commentsCount || 0) + 1 } : p
+      )
+    );
     toast.success("Comment added.");
     await refreshComments(postId, 1);
   };
@@ -1064,26 +1191,41 @@ export default function Home() {
       PAGE(postId, nextArr, cur.page || 1, false);
       return { ...prev, [postId]: nextArr };
     });
+    setPosts((prev) =>
+      prev.map((p) =>
+        p.id === postId
+          ? { ...p, commentsCount: Math.max(0, (p.commentsCount || 1) - 1) }
+          : p
+      )
+    );
     toast.success("Comment deleted.");
   };
 
   /* ---------- modal open/close ---------- */
-  const openPost = useCallback(async (postId) => {
-    setModal({ open: true, loading: true, postId, post: null });
+  const openPost = useCallback(
+    async (postId) => {
+      setModal({ open: true, loading: true, postId, post: null });
 
-    setCmap((prev) => ({ ...prev, [postId]: { ...(prev[postId] || {}), opened: true } }));
-    await loadComments(postId, 1, false);
+      setCmap((prev) => ({
+        ...prev,
+        [postId]: { ...(prev[postId] || {}), opened: true },
+      }));
+      await loadComments(postId, 1, false);
 
-    try {
-      const { data } = await axios.get(`${API}/posts/${postId}`, { headers: authHeaders(token) });
-      const raw = data?.post || data?.data?.post || data?.data || data || {};
-      setModal((m) => ({ ...m, post: normPost(raw), loading: false }));
-    } catch (e) {
-      logAxiosError("Get single post failed", e);
-      setModal((m) => ({ ...m, loading: false }));
-      toast.error("Couldn't open post.");
-    }
-  }, [token]); // eslint-disable-line
+      try {
+        const { data } = await axios.get(`${API}/posts/${postId}`, {
+          headers: authHeaders(token),
+        });
+        const raw = data?.post || data?.data?.post || data?.data || data || {};
+        setModal((m) => ({ ...m, post: normPost(raw), loading: false }));
+      } catch (e) {
+        logAxiosError("Get single post failed", e);
+        setModal((m) => ({ ...m, loading: false }));
+        toast.error("Couldn't open post.");
+      }
+    },
+    [token] // eslint-disable-line react-hooks/exhaustive-deps
+  );
 
   const closeModal = useCallback(() => {
     setModal({ open: false, loading: false, postId: null, post: null });
@@ -1094,7 +1236,9 @@ export default function Home() {
   };
 
   /* ---------- lifecycle ---------- */
-  useEffect(() => { fetchMe(); }, [token]);
+  useEffect(() => {
+    fetchMe();
+  }, [token]);
 
   useEffect(() => {
     fetchPosts(postPage);
@@ -1119,18 +1263,45 @@ export default function Home() {
         [postId]: {
           ...cur,
           openedInline: willOpen,
-          loading: willOpen ? (cur.loading ?? false) : cur.loading, // spinner handled by effect
+          loading: willOpen ? cur.loading ?? false : cur.loading,
         },
       };
     });
   }, []);
+
+  /* ---------- 🔁 Auto-refresh: interval + focus/visibility ---------- */
+  useEffect(() => {
+    // Refresh first page periodically
+    const id = setInterval(() => {
+      if (postPage === 1) fetchPosts(1);
+    }, AUTO_REFRESH_MS);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [postPage]);
+
+  useEffect(() => {
+    const onFocusOrVisible = () => {
+      if (document.visibilityState === "visible" && postPage === 1) {
+        fetchPosts(1);
+      }
+    };
+    window.addEventListener("focus", onFocusOrVisible);
+    document.addEventListener("visibilitychange", onFocusOrVisible);
+    return () => {
+      window.removeEventListener("focus", onFocusOrVisible);
+      document.removeEventListener("visibilitychange", onFocusOrVisible);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [postPage]);
 
   /* ---------------- UI ---------------- */
   return (
     <div className="dark:bg-gray-900 light:bg-gray-50 min-h-screen flex flex-col items-center py-12">
       {/* Composer */}
       <div className="dark:bg-gray-800 light:bg-white w-[90%] max-w-3xl rounded-xl shadow-lg p-5 border light:border-gray-200">
-        <h3 className="dark:text-white light:text-gray-800 text-lg font-semibold mb-3">Post something</h3>
+        <h3 className="dark:text-white light:text-gray-800 text-lg font-semibold mb-3">
+          Post something
+        </h3>
         <div className="flex flex-col space-y-3">
           <textarea
             className="w-full dark:bg-gray-700 light:bg-gray-50 dark:text-white light:text-gray-800 rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 border light:border-gray-300"
@@ -1141,7 +1312,11 @@ export default function Home() {
             disabled={postingPost}
           />
           {imagePreview && (
-            <img src={imagePreview} alt="preview" className="rounded-lg max-h-60 object-cover" />
+            <img
+              src={imagePreview}
+              alt="preview"
+              className="rounded-lg max-h-60 object-cover"
+            />
           )}
           <div className="flex items-center justify-between">
             <label className="cursor-pointer dark:text-gray-400 light:text-gray-600 hover:dark:text-white hover:light:text-gray-800 flex items-center gap-2">
@@ -1152,15 +1327,30 @@ export default function Home() {
                 onChange={handleImageChange}
                 disabled={postingPost}
               />
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1M12 12v9m0 0l-3-3m3 3l3-3M12 3v9" />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-6 w-6"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1M12 12v9m0 0l-3-3m3 3l3-3M12 3v9"
+                />
               </svg>
               <span>Upload</span>
             </label>
             <button
               onClick={handleCreatePost}
               disabled={postingPost || (!postText.trim() && !imageFile)}
-              className={`${postingPost ? "bg-blue-400 cursor-wait" : "bg-blue-600 hover:bg-blue-700"} text-white font-semibold px-6 py-2 rounded-lg`}
+              className={`${
+                postingPost
+                  ? "bg-blue-400 cursor-wait"
+                  : "bg-blue-600 hover:bg-blue-700"
+              } text-white font-semibold px-6 py-2 rounded-lg`}
             >
               {postingPost ? "Posting…" : "Create Post"}
             </button>
@@ -1171,10 +1361,23 @@ export default function Home() {
       {/* Feed */}
       <div className="w-[90%] max-w-3xl mt-8 space-y-5">
         <div className="flex items-center justify-between">
-          <h4 className="dark:text-gray-300 light:text-gray-700 font-semibold">Latest Posts</h4>
-          {postTotalPages > 1 && (
-            <span className="dark:text-gray-400 light:text-gray-500 text-sm">Page : {postPage}</span>
-          )}
+          <h4 className="dark:text-gray-300 light:text-gray-700 font-semibold">
+            Latest Posts
+          </h4>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => fetchPosts(1)}
+              className="px-3 py-1 rounded dark:bg-gray-800 light:bg-gray-200 hover:dark:bg-gray-700 hover:light:bg-gray-300 dark:text-gray-200 light:text-gray-700"
+              title="Reload newest posts"
+            >
+              Refresh
+            </button>
+            {postTotalPages > 1 && (
+              <span className="dark:text-gray-400 light:text-gray-500 text-sm">
+                Page : {postPage}
+              </span>
+            )}
+          </div>
         </div>
 
         {err && <div className="bg-red-100 text-red-700 p-3 rounded">{err}</div>}
@@ -1182,7 +1385,9 @@ export default function Home() {
         {loadingPosts ? (
           <div className="dark:text-gray-300 light:text-gray-600">Loading…</div>
         ) : posts.length === 0 ? (
-          <div className="dark:text-gray-400 light:text-gray-500">No posts yet.</div>
+          <div className="dark:text-gray-400 light:text-gray-500">
+            No posts yet.
+          </div>
         ) : (
           <>
             {posts.map((p) => {
@@ -1194,29 +1399,41 @@ export default function Home() {
                   className="dark:bg-gray-800 light:bg-white rounded-xl shadow-md p-5 border light:border-gray-200"
                 >
                   {/* click anywhere on header/body to open modal */}
-                  <div
-                    className="cursor-pointer"
-                    onClick={() => openPost(p.id)}
-                  >
+                  <div className="cursor-pointer" onClick={() => openPost(p.id)}>
                     <div className="flex items-center gap-3">
-                      <InitialsAvatar name={p.authorName} src={p.authorAvatar} size={44} />
+                      <InitialsAvatar
+                        name={p.authorName}
+                        src={p.authorAvatar}
+                        size={44}
+                      />
                       <div>
-                        <p className="dark:text-white light:text-gray-800 font-semibold">{p.authorName}</p>
+                        <p className="dark:text-white light:text-gray-800 font-semibold">
+                          {p.authorName}
+                        </p>
                         {when && (
-                          <time className="dark:text-gray-400 light:text-gray-500 text-xs" dateTime={new Date(when).toISOString()}>
+                          <time
+                            className="dark:text-gray-400 light:text-gray-500 text-xs"
+                            dateTime={new Date(when).toISOString()}
+                          >
                             {new Date(when).toLocaleString()}
                           </time>
                         )}
                       </div>
                     </div>
 
-                    {p.content && <p className="dark:text-gray-200 light:text-gray-700 mt-3 whitespace-pre-line">{p.content}</p>}
+                    {p.content && (
+                      <p className="dark:text-gray-200 light:text-gray-700 mt-3 whitespace-pre-line">
+                        {p.content}
+                      </p>
+                    )}
                     {p.image && (
                       <img
                         src={p.image}
                         alt="post"
                         className="rounded-lg mt-3 max-h-[520px] w-full object-cover"
-                        onError={(e) => (e.currentTarget.style.display = "none")}
+                        onError={(e) =>
+                          (e.currentTarget.style.display = "none")
+                        }
                       />
                     )}
                   </div>
@@ -1224,20 +1441,36 @@ export default function Home() {
                   {/* Actions */}
                   <div className="flex items-center gap-6 dark:text-gray-400 light:text-gray-500 mt-4">
                     <span className="inline-flex items-center gap-2" title="likes">
-                      <span role="img" aria-label="like">👍</span>
+                      <span role="img" aria-label="like">
+                        👍
+                      </span>
                     </span>
 
                     <button
                       className="inline-flex items-center gap-2 hover:dark:text-gray-200 hover:light:text-gray-700"
                       title="comments"
-                      onClick={(e) => { e.stopPropagation(); toggleInlineComments(p.id); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleInlineComments(p.id);
+                      }}
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16h6m2 4H7a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v12a2 2 0 01-2 2z" />
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-5 w-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M8 10h.01M12 10h.01M16 10h.01M9 16h6m2 4H7a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v12a2 2 0 01-2 2z"
+                        />
                       </svg>
                       <span>{p.commentsCount}</span>
                       <span className="text-xs ml-1">
-                        {(cmap[p.id]?.openedInline ? "Hide" : "Show")}
+                        {cmap[p.id]?.openedInline ? "Hide" : "Show"}
                       </span>
                     </button>
                   </div>
@@ -1246,7 +1479,7 @@ export default function Home() {
                   <div className={cmap[p.id]?.openedInline ? "" : "hidden"}>
                     <InlineComments
                       postId={p.id}
-                      openedInline={!!cmap[p.id]?.openedInline}   // ← drives self-loading
+                      openedInline={!!cmap[p.id]?.openedInline} // ← drives self-loading
                       cmap={cmap}
                       setCmap={setCmap}
                       isAuthed={isAuthed}
@@ -1276,7 +1509,9 @@ export default function Home() {
       {/* Modal */}
       <PostModal
         m={modal}
-        onBackdropMouseDown={(e) => { if (e.target === e.currentTarget) closeModal(); }}
+        onBackdropMouseDown={(e) => {
+          if (e.target === e.currentTarget) closeModal();
+        }}
         closeModal={closeModal}
         cmap={cmap}
         setCmap={setCmap}
