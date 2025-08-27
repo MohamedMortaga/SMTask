@@ -42,8 +42,8 @@ const API = "https://linked-posts.routemisr.com";
 // client-side page size for COMMENTS only
 const PAGE_SIZE = 5;
 
-// server-side page size for POSTS
-const POSTS_LIMIT = 20;
+// server-side page size for POSTS (set 10 for your test; change anytime)
+const POSTS_LIMIT = 6;
 
 // read token
 const getToken = () => {
@@ -154,40 +154,38 @@ const logAxiosError = (label, err) => {
   }
 };
 
-// read pagination meta (fallback if API doesn't give totals)
-const getPostPagination = (data, limit, listLen) => {
+/**
+ * Read pagination meta from API if present; otherwise behave like "infinite next":
+ * keep showing Next until a page returns fewer than `limit` items.
+ * We ALWAYS trust the requested page number (`requestedPage`) for the UI.
+ */
+const getPostPagination = (data, limit, listLen, requestedPage) => {
   const meta =
     data?.paginationResult ||
     data?.data?.paginationResult ||
     data?.metadata ||
     {};
   const total = meta.total || data?.total || data?.data?.total || meta.count;
-  const totalPages =
+  const totalPagesFromMeta =
     meta.numberOfPages ||
     meta.totalPages ||
     data?.totalPages ||
     data?.data?.totalPages ||
-    (typeof total === "number" && limit ? Math.max(1, Math.ceil(total / limit)) : undefined);
+    (typeof total === "number" && limit
+      ? Math.max(1, Math.ceil(total / limit))
+      : undefined);
 
-  const current =
-    meta.currentPage ||
-    data?.page ||
-    data?.data?.page ||
-    meta.page ||
-    undefined;
+  const current = requestedPage;
 
-  // Fallback: allow going Next if we got a full page (listLen === limit)
-  const fallbackPages =
-    typeof totalPages === "number"
-      ? totalPages
-      : listLen === limit
-      ? (current || 1) + 1
-      : current || 1;
+  // If API didn't provide totalPages, keep "one page ahead" until fewer than limit are returned
+  if (typeof totalPagesFromMeta !== "number") {
+    return {
+      page: current,
+      totalPages: listLen < limit ? current : current + 1,
+    };
+  }
 
-  return {
-    page: current || 1,
-    totalPages: typeof totalPages === "number" ? totalPages : fallbackPages,
-  };
+  return { page: current, totalPages: totalPagesFromMeta };
 };
 
 // build compact window like: Back [1] 2 3 4 5 … 25 Next
@@ -407,14 +405,20 @@ export default function Home() {
         previews[pid] = norm[0] || null;
       });
 
-      const { totalPages } = getPostPagination(data, POSTS_LIMIT, list.length);
+      // dynamic/infinite fallback if totals are missing
+      const { page: current, totalPages } = getPostPagination(
+        data,
+        POSTS_LIMIT,
+        list.length,
+        page
+      );
 
       setCommentsCache((prev) => ({ ...prev, ...cache }));
       setPosts(normalized);
 
-      // trust the page we requested (don't rely on server currentPage)
+      // Always trust the page we requested
+      setPostPage(current);
       setPostTotalPages(Math.max(1, totalPages || 1));
-      setPostPage(page);
 
       setCmap((prev) => {
         const next = { ...prev };
@@ -682,9 +686,7 @@ export default function Home() {
             return { ok: true };
           } catch (e2) {
             logAxiosError("Delete (Bearer) failed", e2);
-            if ((e2?.response?.status || 0) === 403) {
-              return { ok: false, forbidden: true };
-            }
+            if ((e2?.response?.status || 0) === 403) return { ok: false, forbidden: true };
           }
         }
         try {
@@ -843,7 +845,7 @@ export default function Home() {
           <h4 className="text-gray-300 font-semibold">Latest Posts</h4>
           {postTotalPages > 1 && (
             <span className="text-gray-400 text-sm">
-              Page {postPage} / {postTotalPages}
+              Page : {postPage}
             </span>
           )}
         </div>
