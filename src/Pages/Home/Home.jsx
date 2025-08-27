@@ -68,7 +68,7 @@ const headerVariants = (token) =>
     : [{}];
 
 const normPost = (p = {}) => {
-  const u = p.user || p.author || {};
+  const u = p.user || p.author || p.createdBy || p.owner || {};
   const name =
     u.name ||
     u.fullName ||
@@ -233,7 +233,7 @@ export default function Home() {
     }
   };
 
-  /* ---------- CREATE POST (multipart with body + optional image) ---------- */
+  /* ---------- CREATE POST (multipart) + optimistic add + authoritative refresh ---------- */
   const handleCreatePost = async () => {
     if (!isAuthed) return alert("Please sign in first.");
     const text = postText.trim();
@@ -246,36 +246,49 @@ export default function Home() {
     setPostingPost(true);
     let created = null;
     try {
-      const { data } = await axios.post(`${API}/posts`, form, { headers: authHeaders(token) });
+      const { data } = await axios.post(`${API}/posts`, form, {
+        headers: { ...authHeaders(token), "Content-Type": "multipart/form-data" },
+      });
       created = data?.post || data?.data?.post || data?.data || null;
     } catch (e) {
       logAxiosError("Create post failed", e);
+    } finally {
+      setPostingPost(false);
     }
-    setPostingPost(false);
 
     if (!created) {
       alert("Couldn't create the post. Please check your login and try again.");
       return;
     }
 
+    // Clear composer UI
     setPostText("");
     setImageFile(null);
     setImagePreview(null);
 
+    // Optimistic add to show instantly
     try {
       const normalized = normPost(created);
       const safe = {
         ...normalized,
         authorId: normalized.authorId || me?.id || null,
-        authorName: normalized.authorName || me?.name || "You",
-        authorAvatar: normalized.authorAvatar || me?.avatar || null,
+        authorName:
+          normalized.authorName && normalized.authorName !== "Unknown"
+            ? normalized.authorName
+            : (me?.name || "You"),
+        authorAvatar: normalized.authorAvatar ?? me?.avatar ?? null,
+        createdAt: normalized.createdAt || new Date().toISOString(),
+        commentsCount: normalized.commentsCount ?? 0,
       };
       setPosts((prev) => [safe, ...prev]);
       setCommentsCache((prev) => ({ ...prev, [safe.id]: [] }));
       setCmap((prev) => ({ ...prev, [safe.id]: { preview: null } }));
     } catch {
-      await fetchPosts();
+      /* ignore */
     }
+
+    // Authoritative refresh (guarantees it shows even if API enriches the record)
+    await fetchPosts();
   };
 
   /* ---------- FETCH POSTS ---------- */
@@ -289,6 +302,7 @@ export default function Home() {
 
       const normalized = list
         .map(normPost)
+        .filter((p) => p.id)
         .sort(
           (a, b) =>
             (Date.parse(b.createdAt || b.updatedAt) || 0) -
@@ -407,7 +421,7 @@ export default function Home() {
     }));
   };
 
-  /* ---------- ADD / UPDATE COMMENT (reverted to older working flow for edit) ---------- */
+  /* ---------- ADD / UPDATE COMMENT (uses your proven logic) ---------- */
   const submitComment = async (postId) => {
     const cur = cmap[postId] || {};
     const text = (cur.input || "").trim();
@@ -456,7 +470,7 @@ export default function Home() {
       return;
     }
 
-    // CREATE new (same as before)
+    // CREATE new (same as your code)
     let success = false;
     try {
       await axios.post(`${API}/comments`, { content: text, post: postId }, { headers: authHeaders(token) });
@@ -493,84 +507,83 @@ export default function Home() {
     }));
   };
 
- /* ---------- DELETE COMMENT (robust) ---------- */
-const deleteComment = async (postId, commentId) => {
-  const cur = cmap[postId] || {};
+  /* ---------- DELETE COMMENT (uses your robust logic) ---------- */
+  const deleteComment = async (postId, commentId) => {
+    const cur = cmap[postId] || {};
 
-  // if it's a local optimistic id, just remove it client-side
-  if (String(commentId).startsWith("local-")) {
+    // if it's a local optimistic id, just remove it client-side
+    if (String(commentId).startsWith("local-")) {
+      setCommentsCache((prev) => {
+        const nextArr = (prev[postId] || []).filter((c) => c.id !== commentId);
+        PAGE(postId, nextArr, cur.page || 1, false);
+        return { ...prev, [postId]: nextArr };
+      });
+      return;
+    }
+
+    setCmap((prev) => ({
+      ...prev,
+      [postId]: { ...(prev[postId] || {}), savingEdit: true, errorMsg: "" },
+    }));
+
+    // try token-only first (most consistent with this API), then fallbacks
+    const tryDelete = async () => {
+      try {
+        await axios.delete(`${API}/comments/${commentId}`, { headers: { token } });
+        return true;
+      } catch (e1) {
+        logAxiosError("Delete (token) failed", e1);
+        const status = e1?.response?.status || 0;
+
+        // Authorization fallback
+        if (status === 401 || status === 403) {
+          try {
+            await axios.delete(`${API}/comments/${commentId}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            return true;
+          } catch (e2) {
+            logAxiosError("Delete (Bearer) failed", e2);
+          }
+        }
+
+        // last resort: some deployments expect post id in query
+        try {
+          await axios.delete(`${API}/comments/${commentId}?post=${encodeURIComponent(postId)}`, {
+            headers: { token },
+          });
+          return true;
+        } catch (e3) {
+          logAxiosError("Delete (with ?post=) failed", e3);
+          return false;
+        }
+      }
+    };
+
+    const ok = await tryDelete();
+
+    setCmap((prev) => ({
+      ...prev,
+      [postId]: { ...(prev[postId] || {}), savingEdit: false },
+    }));
+
+    if (!ok) {
+      setCmap((prev) => ({
+        ...prev,
+        [postId]: {
+          ...(prev[postId] || {}),
+          errorMsg: "Couldn’t delete the comment (check permissions/login).",
+        },
+      }));
+      return;
+    }
+
     setCommentsCache((prev) => {
       const nextArr = (prev[postId] || []).filter((c) => c.id !== commentId);
       PAGE(postId, nextArr, cur.page || 1, false);
       return { ...prev, [postId]: nextArr };
     });
-    return;
-  }
-
-  setCmap((prev) => ({
-    ...prev,
-    [postId]: { ...(prev[postId] || {}), savingEdit: true, errorMsg: "" },
-  }));
-
-  // try token-only first (most consistent with this API), then fallbacks
-  const tryDelete = async () => {
-    try {
-      await axios.delete(`${API}/comments/${commentId}`, { headers: { token } });
-      return true;
-    } catch (e1) {
-      logAxiosError("Delete (token) failed", e1);
-      const status = e1?.response?.status || 0;
-
-      // Authorization fallback
-      if (status === 401 || status === 403) {
-        try {
-          await axios.delete(`${API}/comments/${commentId}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          return true;
-        } catch (e2) {
-          logAxiosError("Delete (Bearer) failed", e2);
-        }
-      }
-
-      // last resort: some deployments expect post id in query
-      try {
-        await axios.delete(`${API}/comments/${commentId}?post=${encodeURIComponent(postId)}`, {
-          headers: { token },
-        });
-        return true;
-      } catch (e3) {
-        logAxiosError("Delete (with ?post=) failed", e3);
-        return false;
-      }
-    }
   };
-
-  const ok = await tryDelete();
-
-  setCmap((prev) => ({
-    ...prev,
-    [postId]: { ...(prev[postId] || {}), savingEdit: false },
-  }));
-
-  if (!ok) {
-    setCmap((prev) => ({
-      ...prev,
-      [postId]: {
-        ...(prev[postId] || {}),
-        errorMsg: "Couldn’t delete the comment (check permissions/login).",
-      },
-    }));
-    return;
-  }
-
-  setCommentsCache((prev) => {
-    const nextArr = (prev[postId] || []).filter((c) => c.id !== commentId);
-    PAGE(postId, nextArr, cur.page || 1, false);
-    return { ...prev, [postId]: nextArr };
-  });
-};
-
 
   /* ---------- lifecycle ---------- */
   useEffect(() => {
