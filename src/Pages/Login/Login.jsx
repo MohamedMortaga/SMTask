@@ -114,22 +114,22 @@ export default function Login() {
   };
 
   return (
-    <div className="bg-teal-500 min-h-[85vh] flex flex-col items-center justify-center py-8">
+    <div className="dark:bg-teal-500 light:bg-teal-400 min-h-[85vh] flex flex-col items-center justify-center py-8">
       <form
         onSubmit={handleSubmit(onSubmit)}
-        className="text-center w-[90%] md:w-1/2 bg-teal-400 mx-auto p-12 rounded-lg shadow-lg"
+        className="text-center w-[90%] md:w-1/2 dark:bg-teal-400 light:bg-white mx-auto p-12 rounded-lg shadow-lg border light:border-gray-200"
         noValidate
       >
-        <h1 className="text-4xl font-bold text-white uppercase mb-8">
+        <h1 className="text-4xl font-bold dark:text-white light:text-gray-800 uppercase mb-8">
           LOGIN
         </h1>
 
         {/* Email */}
         <div className="mb-4">
-          <p className="text-left text-white">Email</p>
+          <p className="text-left dark:text-white light:text-gray-700">Email</p>
           <input
             type="email"
-            className="p-2 rounded w-full outline-none focus:ring-2 focus:ring-teal-600"
+            className="p-2 rounded w-full outline-none focus:ring-2 focus:ring-teal-600 border light:border-gray-300"
             {...register("email", {
               required: "Email is required",
               pattern: {
@@ -147,10 +147,10 @@ export default function Login() {
 
         {/* Password */}
         <div className="mb-4">
-          <p className="text-left text-white">Password</p>
+          <p className="text-left dark:text-white light:text-gray-700">Password</p>
           <input
             type="password"
-            className="p-2 rounded w-full outline-none focus:ring-2 focus:ring-teal-600"
+            className="p-2 rounded w-full outline-none focus:ring-2 focus:ring-teal-600 border light:border-gray-300"
             {...register("password", {
               required: "Password is required",
               minLength: { value: 6, message: "Min length is 6 characters" },
@@ -166,7 +166,7 @@ export default function Login() {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="bg-white text-teal-500 font-bold py-2 px-20 rounded 
+          className="dark:bg-white dark:text-teal-500 light:bg-teal-600 light:text-white font-bold py-2 px-20 rounded 
                      transition-all duration-300 
                      hover:bg-teal-600 hover:text-white hover:scale-105 
                      active:scale-95 disabled:opacity-60"

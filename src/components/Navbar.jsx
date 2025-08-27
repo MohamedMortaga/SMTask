@@ -18,7 +18,7 @@ const readSavedUser = () => {
 };
 
 /* ---------- component ---------- */
-export default function Navbar() {
+export default function Navbar({ theme, toggleTheme }) {
   const [isOpen, setIsOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
   const [isAuthed, setIsAuthed] = useState(!!readToken());
@@ -141,7 +141,7 @@ export default function Navbar() {
     "User";
 
   return (
-    <nav className={styles.navbar}>
+    <nav className={`${styles.navbar} ${theme === 'light' ? styles.navbarLight : styles.navbarDark}`}>
       <div className={styles.navContainer}>
         <Link className={styles.brand} to="/">Kudo</Link>
 
@@ -163,13 +163,23 @@ export default function Navbar() {
             </>
           )}
 
+          {/* Theme Toggle Button */}
+          <button
+            onClick={toggleTheme}
+            className={`${styles.themeToggle} ${theme === 'light' ? styles.themeToggleLight : styles.themeToggleDark}`}
+            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+          >
+            {theme === 'dark' ? '☀️' : '🌙'}
+          </button>
+
           <div className={styles.profileWrap}>
             {isAuthed ? (
               <>
                 <button
                   ref={btnRef}
                   onClick={() => setUserOpen(v => !v)}
-                  className={styles.userBtn}
+                  className={`${styles.userBtn} ${theme === 'light' ? styles.userBtnLight : styles.userBtnDark}`}
                   aria-haspopup="menu"
                   aria-expanded={userOpen}
                   title={displayName}
@@ -186,20 +196,20 @@ export default function Navbar() {
                 <div
                   ref={menuRef}
                   role="menu"
-                  className={`${styles.menu} ${userOpen ? styles.open : ""}`}
+                  className={`${styles.menu} ${userOpen ? styles.open : ""} ${theme === 'light' ? styles.menuLight : styles.menuDark}`}
                 >
-                  <div className={styles.menuHeader}>
+                  <div className={`${styles.menuHeader} ${theme === 'light' ? styles.menuHeaderLight : styles.menuHeaderDark}`}>
                     <div className={styles.menuName}>{displayName}</div>
                     {user.email ? <span className={styles.menuEmail}>{user.email}</span> : null}
                   </div>
 
-                  <Link to="/profile" role="menuitem" className={styles.menuItem}>
+                  <Link to="/profile" role="menuitem" className={`${styles.menuItem} ${theme === 'light' ? styles.menuItemLight : styles.menuItemDark}`}>
                     Profile
                   </Link>
 
-                  <div className={styles.menuDivider} />
+                  <div className={`${styles.menuDivider} ${theme === 'light' ? styles.menuDividerLight : styles.menuDividerDark}`} />
 
-                  <button role="menuitem" className={styles.menuItem} onClick={handleLogout}>
+                  <button role="menuitem" className={`${styles.menuItem} ${theme === 'light' ? styles.menuItemLight : styles.menuItemDark}`} onClick={handleLogout}>
                     Sign out
                   </button>
                 </div>

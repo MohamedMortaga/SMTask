@@ -236,29 +236,29 @@ const InlineComments = memo(function InlineComments({
 
   return (
     <div
-      className="mt-3 rounded-xl border border-gray-700 bg-gray-800/60"
+      className="mt-3 rounded-xl border dark:border-gray-700 light:border-gray-300 dark:bg-gray-800/60 light:bg-white"
       onClick={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
     >
-      <div className="px-4 py-3 border-b border-gray-700 text-gray-200 font-semibold">
+      <div className="px-4 py-3 border-b dark:border-gray-700 light:border-gray-300 dark:text-gray-200 light:text-gray-800 font-semibold">
         Comments
       </div>
 
       <div className="max-h-[360px] overflow-auto p-3 space-y-3">
         {loading ? (
-          <div className="text-gray-300">Loading comments…</div>
+          <div className="dark:text-gray-300 light:text-gray-600">Loading comments…</div>
         ) : all.length === 0 ? (
-          <div className="text-gray-400">No comments yet.</div>
+          <div className="dark:text-gray-400 light:text-gray-500">No comments yet.</div>
         ) : (
           all.map((c) => (
-            <div key={c.id} className="bg-gray-700 rounded p-3 text-gray-100">
+                         <div key={c.id} className="dark:bg-gray-700 light:bg-white rounded p-3 dark:text-gray-100 light:text-gray-800 border light:border-gray-200 shadow-sm">
               <div className="flex items-start gap-3">
                 <InitialsAvatar name={c.authorName} src={c.authorAvatar} size={28} />
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <span className="font-semibold">{c.authorName}</span>
                     {c.createdAt && (
-                      <time className="text-xs text-gray-300">
+                      <time className="text-xs dark:text-gray-300 light:text-gray-500">
                         {new Date(c.createdAt).toLocaleString()}
                       </time>
                     )}
@@ -269,7 +269,7 @@ const InlineComments = memo(function InlineComments({
                   <div className="flex items-center gap-2 self-start">
                     <button
                       title="Edit"
-                      className="p-1 rounded hover:bg-gray-600"
+                      className="p-1 rounded hover:dark:bg-gray-600 hover:light:bg-gray-200"
                       onClick={() =>
                         setCmap((prev) => ({
                           ...prev,
@@ -282,7 +282,7 @@ const InlineComments = memo(function InlineComments({
                     </button>
                     <button
                       title="Delete"
-                      className="p-1 rounded hover:bg-gray-600"
+                      className="p-1 rounded hover:dark:bg-gray-600 hover:light:bg-gray-200"
                       onClick={() => deleteComment(postId, c.id)}
                       disabled={savingEdit || posting}
                     >
@@ -308,10 +308,10 @@ const InlineComments = memo(function InlineComments({
 
       {/* composer */}
       {isAuthed && (
-        <div className="p-3 border-t border-gray-700">
+        <div className="p-3 border-t dark:border-gray-700 light:border-gray-300">
           <textarea
             ref={inputRef}
-            className="w-full bg-gray-700 text-gray-100 rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full dark:bg-gray-700 light:bg-white dark:text-gray-100 light:text-gray-800 rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 border light:border-gray-300"
             placeholder={editingId ? "Edit your comment..." : "Write a comment..."}
             rows={2}
             value={input || ""}
@@ -359,22 +359,22 @@ function Pager({ page, total, onGo }) {
       <button
         onClick={() => onGo(Math.max(1, page - 1))}
         disabled={page === 1}
-        className={`px-3 py-1 rounded ${page === 1 ? "bg-gray-700 text-gray-500" : "bg-gray-800 hover:bg-gray-700 text-gray-200"}`}
+        className={`px-3 py-1 rounded ${page === 1 ? "dark:bg-gray-700 light:bg-gray-300 dark:text-gray-500 light:text-gray-400" : "dark:bg-gray-800 light:bg-gray-200 hover:dark:bg-gray-700 hover:light:bg-gray-300 dark:text-gray-200 light:text-gray-700"}`}
       >
         Back
       </button>
 
       {items.map((it, idx) =>
         it === "…" ? (
-          <span key={`dots-${idx}`} className="px-2 text-gray-400">…</span>
+          <span key={`dots-${idx}`} className="px-2 dark:text-gray-400 light:text-gray-500">…</span>
         ) : (
           <button
             key={it}
             onClick={() => onGo(it)}
             className={`w-8 h-8 rounded ${
               it === page
-                ? "bg-black text-white"
-                : "bg-gray-800 hover:bg-gray-700 text-gray-200"
+                ? "dark:bg-black light:bg-gray-800 dark:text-white light:text-white"
+                : "dark:bg-gray-800 light:bg-gray-200 hover:dark:bg-gray-700 hover:light:bg-gray-300 dark:text-gray-200 light:text-gray-700"
             }`}
             title={`Go to page ${it}`}
           >
@@ -386,7 +386,7 @@ function Pager({ page, total, onGo }) {
       <button
         onClick={() => onGo(Math.min(total, page + 1))}
         disabled={page === total}
-        className={`px-3 py-1 rounded ${page === total ? "bg-gray-700 text-gray-500" : "bg-gray-800 hover:bg-gray-700 text-gray-200"}`}
+        className={`px-3 py-1 rounded ${page === total ? "dark:bg-gray-700 light:bg-gray-300 dark:text-gray-500 light:text-gray-400" : "dark:bg-gray-800 light:bg-gray-200 hover:dark:bg-gray-700 hover:light:bg-gray-300 dark:text-gray-200 light:text-gray-700"}`}
       >
         Next
       </button>
@@ -437,46 +437,46 @@ function PostModal({
   const post = m.post || posts.find((p) => p.id === pid);
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"
-      onMouseDown={onBackdropMouseDown}
-    >
-      <div
-        className="bg-gray-900 rounded-2xl shadow-xl w-full max-w-6xl h-[100vh] overflow-hidden grid grid-cols-1 lg:grid-cols-[1fr_380px]"
-        onMouseDown={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-      >
-        {/* Left: post */}
-        <div className="relative h-full overflow-auto">
-          {m.loading ? (
-            <div className="h-full flex items-center justify-center text-gray-300">Loading post…</div>
-          ) : !post ? (
-            <div className="h-full flex items-center justify-center text-gray-400">Post not found.</div>
-          ) : (
-            <div className="p-5">
-              <div className="flex items-center gap-3">
-                <InitialsAvatar name={post.authorName} src={post.authorAvatar} size={46} />
-                <div>
-                  <p className="text-white font-semibold">{post.authorName}</p>
-                  {(post.createdAt || post.updatedAt) && (
-                    <time className="text-gray-400 text-xs">
-                      {new Date(post.createdAt || post.updatedAt).toLocaleString()}
-                    </time>
-                  )}
-                </div>
-              </div>
-              {post.content && (
-                <p className="text-gray-200 mt-4 whitespace-pre-line">{post.content}</p>
-              )}
-              {post.image && (
-                <img
-                  src={post.image}
-                  alt="post"
-                  className="rounded-xl mt-4 max-h-[60vh] w-full object-contain bg-black/20"
-                  onError={(e) => (e.currentTarget.style.display = "none")}
-                />
-              )}
+              <div
+       className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+       onMouseDown={onBackdropMouseDown}
+     >
+       <div
+         className="bg-gray-900 rounded-2xl shadow-xl w-full max-w-6xl h-[100vh] overflow-hidden grid grid-cols-1 lg:grid-cols-[1fr_380px]"
+         onMouseDown={(e) => e.stopPropagation()}
+         role="dialog"
+         aria-modal="true"
+       >
+         {/* Left: post */}
+         <div className="relative h-full overflow-auto bg-gray-900">
+                     {m.loading ? (
+             <div className="h-full flex items-center justify-center text-gray-300">Loading post…</div>
+           ) : !post ? (
+             <div className="h-full flex items-center justify-center text-gray-400">Post not found.</div>
+           ) : (
+             <div className="p-5">
+               <div className="flex items-center gap-3">
+                 <InitialsAvatar name={post.authorName} src={post.authorAvatar} size={46} />
+                 <div>
+                   <p className="text-white font-semibold">{post.authorName}</p>
+                   {(post.createdAt || post.updatedAt) && (
+                     <time className="text-gray-400 text-xs">
+                       {new Date(post.createdAt || post.updatedAt).toLocaleString()}
+                     </time>
+                   )}
+                 </div>
+               </div>
+               {post.content && (
+                 <p className="text-gray-200 mt-4 whitespace-pre-line">{post.content}</p>
+               )}
+                             {post.image && (
+                 <img
+                   src={post.image}
+                   alt="post"
+                   className="rounded-xl mt-4 max-h-[60vh] w-full object-contain bg-black/20"
+                   onError={(e) => (e.currentTarget.style.display = "none")}
+                 />
+               )}
             </div>
           )}
           <button
@@ -488,58 +488,58 @@ function PostModal({
           </button>
         </div>
 
-        {/* Right: comments */}
-        <aside className="h-full bg-gray-800 border-l border-gray-700 flex flex-col">
-          <div className="px-4 py-3 border-b border-gray-700 text-gray-200 font-semibold">
-            Comments
-          </div>
+                 {/* Right: comments */}
+         <aside className="h-full bg-gray-800 border-l border-gray-700 flex flex-col">
+           <div className="px-4 py-3 border-b border-gray-700 text-gray-200 font-semibold">
+             Comments
+           </div>
 
-          <div className="flex-1 overflow-auto p-3 space-y-1">
-            {loading ? (
-              <div className="text-gray-300">Loading comments…</div>
-            ) : all.length === 0 ? (
-              <div className="text-gray-400">No comments yet.</div>
-            ) : (
-              all.map((c) => (
-                <div key={c.id} className="bg-gray-700 rounded-xl p-3 text-gray-100">
-                  <div className="flex items-start gap-3">
-                    <InitialsAvatar name={c.authorName} src={c.authorAvatar} size={28} />
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold">{c.authorName}</span>
-                        {c.createdAt && (
-                          <time className="text-xs text-gray-300">
-                            {new Date(c.createdAt).toLocaleString()}
-                          </time>
-                        )}
-                      </div>
-                      <div className="text-sm whitespace-pre-line mt-1">{c.text}</div>
-                    </div>
-                    {canEditDelete(c) && (
-                      <div className="flex items-center gap-2 self-start">
-                        <button
-                          title="Edit"
-                          className="p-1 rounded hover:bg-gray-600"
-                          onClick={() =>
-                            setCmap((prev) => ({
-                              ...prev,
-                              [pid]: { ...(prev[pid] || {}), editingId: c.id, input: c.text },
-                            }))
-                          }
-                          disabled={savingEdit || posting}
-                        >
-                          ✎
-                        </button>
-                        <button
-                          title="Delete"
-                          className="p-1 rounded hover:bg-gray-600"
-                          onClick={() => deleteComment(pid, c.id)}
-                          disabled={savingEdit || posting}
-                        >
-                          🗑
-                        </button>
-                      </div>
-                    )}
+           <div className="flex-1 overflow-auto p-3 space-y-1">
+             {loading ? (
+               <div className="text-gray-300">Loading comments…</div>
+             ) : all.length === 0 ? (
+               <div className="text-gray-400">No comments yet.</div>
+             ) : (
+               all.map((c) => (
+                 <div key={c.id} className="bg-gray-700 rounded-xl p-3 text-gray-100 border border-gray-600 shadow-sm">
+                                       <div className="flex items-start gap-3">
+                       <InitialsAvatar name={c.authorName} src={c.authorAvatar} size={28} />
+                       <div className="flex-1">
+                         <div className="flex items-center gap-2">
+                           <span className="font-semibold">{c.authorName}</span>
+                           {c.createdAt && (
+                             <time className="text-xs text-gray-300">
+                               {new Date(c.createdAt).toLocaleString()}
+                             </time>
+                           )}
+                         </div>
+                         <div className="text-sm whitespace-pre-line mt-1">{c.text}</div>
+                       </div>
+                                         {canEditDelete(c) && (
+                       <div className="flex items-center gap-2 self-start">
+                         <button
+                           title="Edit"
+                           className="p-1 rounded hover:bg-gray-600 transition-colors"
+                           onClick={() =>
+                             setCmap((prev) => ({
+                               ...prev,
+                               [pid]: { ...(prev[pid] || {}), editingId: c.id, input: c.text },
+                             }))
+                           }
+                           disabled={savingEdit || posting}
+                         >
+                           ✎
+                         </button>
+                         <button
+                           title="Delete"
+                           className="p-1 rounded hover:bg-gray-600 transition-colors"
+                           onClick={() => deleteComment(pid, c.id)}
+                           disabled={savingEdit || posting}
+                         >
+                           🗑
+                         </button>
+                       </div>
+                     )}
                   </div>
                 </div>
               ))
@@ -556,22 +556,22 @@ function PostModal({
             )}
           </div>
 
-          {isAuthed && (
-            <div className="p-3 border-t border-gray-700">
-              <textarea
-                ref={inputRef}
-                className="w-full bg-gray-700 text-gray-100 rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder={editingId ? "Edit your comment..." : "Write a comment..."}
-                rows={2}
-                value={input || ""}
-                onChange={(e) =>
-                  setCmap((prev) => ({
-                    ...prev,
-                    [pid]: { ...(prev[pid] || {}), input: e.target.value },
-                  }))
-                }
-                disabled={posting || savingEdit}
-              />
+                     {isAuthed && (
+             <div className="p-3 border-t border-gray-700">
+               <textarea
+                 ref={inputRef}
+                 className="w-full bg-gray-700 text-gray-100 rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-600"
+                 placeholder={editingId ? "Edit your comment..." : "Write a comment..."}
+                 rows={2}
+                 value={input || ""}
+                 onChange={(e) =>
+                   setCmap((prev) => ({
+                     ...prev,
+                     [pid]: { ...(prev[pid] || {}), input: e.target.value },
+                   }))
+                 }
+                 disabled={posting || savingEdit}
+               />
               <div className="flex items-center gap-2 mt-2">
                 <button
                   onClick={() => submitComment(pid)}
@@ -1127,13 +1127,13 @@ export default function Home() {
 
   /* ---------------- UI ---------------- */
   return (
-    <div className="bg-gray-900 min-h-screen flex flex-col items-center py-12">
+    <div className="dark:bg-gray-900 light:bg-gray-50 min-h-screen flex flex-col items-center py-12">
       {/* Composer */}
-      <div className="bg-gray-800 w-[90%] max-w-3xl rounded-xl shadow-lg p-5">
-        <h3 className="text-white text-lg font-semibold mb-3">Post something</h3>
+      <div className="dark:bg-gray-800 light:bg-white w-[90%] max-w-3xl rounded-xl shadow-lg p-5 border light:border-gray-200">
+        <h3 className="dark:text-white light:text-gray-800 text-lg font-semibold mb-3">Post something</h3>
         <div className="flex flex-col space-y-3">
           <textarea
-            className="w-full bg-gray-700 text-white rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full dark:bg-gray-700 light:bg-gray-50 dark:text-white light:text-gray-800 rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 border light:border-gray-300"
             placeholder="Say something…"
             rows={3}
             value={postText}
@@ -1144,7 +1144,7 @@ export default function Home() {
             <img src={imagePreview} alt="preview" className="rounded-lg max-h-60 object-cover" />
           )}
           <div className="flex items-center justify-between">
-            <label className="cursor-pointer text-gray-400 hover:text-white flex items-center gap-2">
+            <label className="cursor-pointer dark:text-gray-400 light:text-gray-600 hover:dark:text-white hover:light:text-gray-800 flex items-center gap-2">
               <input
                 type="file"
                 accept="image/*"
@@ -1171,18 +1171,18 @@ export default function Home() {
       {/* Feed */}
       <div className="w-[90%] max-w-3xl mt-8 space-y-5">
         <div className="flex items-center justify-between">
-          <h4 className="text-gray-300 font-semibold">Latest Posts</h4>
+          <h4 className="dark:text-gray-300 light:text-gray-700 font-semibold">Latest Posts</h4>
           {postTotalPages > 1 && (
-            <span className="text-gray-400 text-sm">Page : {postPage}</span>
+            <span className="dark:text-gray-400 light:text-gray-500 text-sm">Page : {postPage}</span>
           )}
         </div>
 
         {err && <div className="bg-red-100 text-red-700 p-3 rounded">{err}</div>}
 
         {loadingPosts ? (
-          <div className="text-gray-300">Loading…</div>
+          <div className="dark:text-gray-300 light:text-gray-600">Loading…</div>
         ) : posts.length === 0 ? (
-          <div className="text-gray-400">No posts yet.</div>
+          <div className="dark:text-gray-400 light:text-gray-500">No posts yet.</div>
         ) : (
           <>
             {posts.map((p) => {
@@ -1191,7 +1191,7 @@ export default function Home() {
               return (
                 <article
                   key={p.id}
-                  className="bg-gray-800 rounded-xl shadow-md p-5"
+                  className="dark:bg-gray-800 light:bg-white rounded-xl shadow-md p-5 border light:border-gray-200"
                 >
                   {/* click anywhere on header/body to open modal */}
                   <div
@@ -1201,16 +1201,16 @@ export default function Home() {
                     <div className="flex items-center gap-3">
                       <InitialsAvatar name={p.authorName} src={p.authorAvatar} size={44} />
                       <div>
-                        <p className="text-white font-semibold">{p.authorName}</p>
+                        <p className="dark:text-white light:text-gray-800 font-semibold">{p.authorName}</p>
                         {when && (
-                          <time className="text-gray-400 text-xs" dateTime={new Date(when).toISOString()}>
+                          <time className="dark:text-gray-400 light:text-gray-500 text-xs" dateTime={new Date(when).toISOString()}>
                             {new Date(when).toLocaleString()}
                           </time>
                         )}
                       </div>
                     </div>
 
-                    {p.content && <p className="text-gray-200 mt-3 whitespace-pre-line">{p.content}</p>}
+                    {p.content && <p className="dark:text-gray-200 light:text-gray-700 mt-3 whitespace-pre-line">{p.content}</p>}
                     {p.image && (
                       <img
                         src={p.image}
@@ -1222,13 +1222,13 @@ export default function Home() {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-6 text-gray-400 mt-4">
+                  <div className="flex items-center gap-6 dark:text-gray-400 light:text-gray-500 mt-4">
                     <span className="inline-flex items-center gap-2" title="likes">
                       <span role="img" aria-label="like">👍</span>
                     </span>
 
                     <button
-                      className="inline-flex items-center gap-2 hover:text-gray-200"
+                      className="inline-flex items-center gap-2 hover:dark:text-gray-200 hover:light:text-gray-700"
                       title="comments"
                       onClick={(e) => { e.stopPropagation(); toggleInlineComments(p.id); }}
                     >

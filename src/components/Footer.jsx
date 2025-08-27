@@ -3,7 +3,7 @@ import styles from './Footer.module.css';
 
 export default function Footer() {
   return (
-    <footer className={`${styles.footer} text-white  text-center`}>
+    <footer className={`${styles.footer} text-white text-center`}>
       <div className="flex flex-wrap justify-center gap-8 max-w-[90%] mx-auto p-5">
         <div className="flex-1 max-w-full md:max-w-[33.33%] mt-8 mb-20">
           <h3 className="text-2xl uppercase font-medium font-system mb-5">LOCATION</h3>
@@ -38,9 +38,9 @@ export default function Footer() {
         </div>
       </div>
       
-      <div className="bg-gray-900 py-5 text-sm">
-        <p>Copyright © Your Website 2021</p>
-      </div>
+              <div className="dark:bg-gray-900 light:bg-gray-800 py-5 text-sm">
+          <p>Copyright © Your Website 2021</p>
+        </div>
     </footer>
   );
 }

@@ -201,22 +201,22 @@ export default function Profile() {
 
   if (fetching && !user) {
     return (
-      <div className="bg-teal-500 min-h-[85vh] flex items-center justify-center">
-        <p className="text-white text-xl">Loading profile…</p>
+      <div className="dark:bg-teal-500 light:bg-teal-400 min-h-[85vh] flex items-center justify-center">
+        <p className="dark:text-white light:text-gray-800 text-xl">Loading profile…</p>
       </div>
     );
   }
 
   if (!user) {
     return (
-      <div className="bg-teal-500 min-h-[85vh] flex items-center justify-center">
-        <div className="bg-teal-400 rounded-lg shadow-lg p-8 text-center">
-          <p className="text-white text-lg mb-4">
+      <div className="dark:bg-teal-500 light:bg-teal-400 min-h-[85vh] flex items-center justify-center">
+        <div className="dark:bg-teal-400 light:bg-white rounded-lg shadow-lg p-8 text-center border light:border-gray-200">
+          <p className="dark:text-white light:text-gray-800 text-lg mb-4">
             {err || "No user info found."}
           </p>
           <button
             onClick={fetchProfile}
-            className="bg-white text-teal-600 font-semibold px-5 py-2 rounded hover:bg-teal-700 hover:text-white transition"
+            className="dark:bg-white dark:text-teal-600 light:bg-teal-600 light:text-white font-semibold px-5 py-2 rounded hover:bg-teal-700 hover:text-white transition"
           >
             Retry fetching profile
           </button>
@@ -226,9 +226,9 @@ export default function Profile() {
   }
 
   return (
-    <div className="bg-teal-500 min-h-[85vh] flex flex-col items-center py-16">
-      <div className="w-[92%] sm:w-[520px] bg-teal-400 rounded-2xl shadow-xl p-8">
-        <h1 className="text-4xl font-extrabold text-white tracking-wide text-center mb-6">
+    <div className="dark:bg-teal-500 light:bg-teal-400 min-h-[85vh] flex flex-col items-center py-16">
+      <div className="w-[92%] sm:w-[520px] dark:bg-teal-400 light:bg-white rounded-2xl shadow-xl p-8 border light:border-gray-200">
+        <h1 className="text-4xl font-extrabold dark:text-white light:text-gray-800 tracking-wide text-center mb-6">
           PROFILE
         </h1>
 
@@ -240,7 +240,7 @@ export default function Profile() {
             className="w-28 h-28 rounded-full ring-4 ring-white shadow-md object-cover"
             onError={(e) => (e.currentTarget.src = AVATAR(user.name))}
           />
-          <label className="bg-white text-teal-600 px-4 py-2 rounded-lg cursor-pointer hover:bg-teal-600 hover:text-white transition">
+          <label className="dark:bg-white dark:text-teal-600 light:bg-teal-600 light:text-white px-4 py-2 rounded-lg cursor-pointer hover:bg-teal-700 hover:text-white transition">
             {uploading ? "Uploading…" : "Change Photo"}
             <input
               type="file"
@@ -250,7 +250,7 @@ export default function Profile() {
               disabled={uploading}
             />
           </label>
-          <div className="text-white/90 text-sm">
+          <div className="dark:text-white/90 light:text-gray-600 text-sm">
             {fetching ? "Refreshing from server…" : err ? err : ""}
           </div>
         </div>
@@ -258,17 +258,17 @@ export default function Profile() {
         {/* Info fields (full) */}
         <div className="grid grid-cols-1 gap-4">
           <div>
-            <label className="block text-white font-semibold mb-1">Name</label>
+            <label className="block dark:text-white light:text-gray-700 font-semibold mb-1">Name</label>
             <input
               type="text"
               value={user.name || ""}
               readOnly
-              className="w-full p-3 rounded-lg bg-white/90 text-gray-800 shadow-sm"
+              className="w-full p-3 rounded-lg dark:bg-white/90 light:bg-gray-50 dark:text-gray-800 light:text-gray-800 shadow-sm border light:border-gray-300"
             />
           </div>
 
           <div>
-            <label className="block text-white font-semibold mb-1">Email</label>
+            <label className="block dark:text-white light:text-gray-700 font-semibold mb-1">Email</label>
             <input
               type="email"
               value={user.email || ""}
@@ -279,24 +279,24 @@ export default function Profile() {
           </div>
 
           <div>
-            <label className="block text-white font-semibold mb-1">Gender</label>
+            <label className="block dark:text-white light:text-gray-700 font-semibold mb-1">Gender</label>
             <input
               type="text"
               value={user.gender || "Not provided"}
               readOnly
-              className="w-full p-3 rounded-lg bg-white/90 text-gray-800 shadow-sm"
+              className="w-full p-3 rounded-lg dark:bg-white/90 light:bg-gray-50 dark:text-gray-800 light:text-gray-800 shadow-sm border light:border-gray-300"
             />
           </div>
 
           <div>
-            <label className="block text-white font-semibold mb-1">
+            <label className="block dark:text-white light:text-gray-700 font-semibold mb-1">
               Date of Birth
             </label>
             <input
               type="text"
               value={user.dateOfBirth || "Not provided"}
               readOnly
-              className="w-full p-3 rounded-lg bg-white/90 text-gray-800 shadow-sm"
+              className="w-full p-3 rounded-lg dark:bg-white/90 light:bg-gray-50 dark:text-gray-800 light:text-gray-800 shadow-sm border light:border-gray-300"
             />
           </div>
 
@@ -304,7 +304,7 @@ export default function Profile() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
               {user.createdAt && (
                 <div>
-                  <label className="block text-white font-semibold mb-1">
+                  <label className="block dark:text-white light:text-gray-700 font-semibold mb-1">
                     Created
                   </label>
                   <input
@@ -315,13 +315,13 @@ export default function Profile() {
                         : ""
                     }
                     readOnly
-                    className="w-full p-3 rounded-lg bg-white/90 text-gray-800 shadow-sm"
+                    className="w-full p-3 rounded-lg dark:bg-white/90 light:bg-gray-50 dark:text-gray-800 light:text-gray-800 shadow-sm border light:border-gray-300"
                   />
                 </div>
               )}
               {user.updatedAt && (
                 <div>
-                  <label className="block text-white font-semibold mb-1">
+                  <label className="block dark:text-white light:text-gray-700 font-semibold mb-1">
                     Updated
                   </label>
                   <input
@@ -332,7 +332,7 @@ export default function Profile() {
                         : ""
                     }
                     readOnly
-                    className="w-full p-3 rounded-lg bg-white/90 text-gray-800 shadow-sm"
+                    className="w-full p-3 rounded-lg dark:bg-white/90 light:bg-gray-50 dark:text-gray-800 light:text-gray-800 shadow-sm border light:border-gray-300"
                   />
                 </div>
               )}
@@ -344,7 +344,7 @@ export default function Profile() {
         <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-3">
           <button
             onClick={fetchProfile}
-            className="flex-1 bg-white text-teal-600 font-semibold py-2.5 rounded-lg shadow hover:bg-teal-700 hover:text-white transition"
+            className="flex-1 dark:bg-white dark:text-teal-600 light:bg-teal-600 light:text-white font-semibold py-2.5 rounded-lg shadow hover:bg-teal-700 hover:text-white transition"
           >
             Refresh
           </button>
@@ -365,14 +365,14 @@ export default function Profile() {
 
       {/* Password Change Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl p-6 w-[92%] sm:w-[440px]">
+                 <div className="fixed inset-0 dark:bg-black/50 light:bg-black/30 flex items-center justify-center z-50">
+                       <div className="dark:bg-white light:bg-white rounded-xl shadow-xl p-6 w-[92%] sm:w-[440px]">
             <h2 className="text-xl font-bold text-teal-600 mb-4 text-center">
               Change Password
             </h2>
 
             {/* Show the actual regex as requested */}
-            <div className="text-xs bg-gray-100 rounded p-2 mb-3 overflow-x-auto">
+                         <div className="text-xs dark:bg-gray-100 light:bg-gray-50 rounded p-2 mb-3 overflow-x-auto">
               <span className="font-semibold">PASSWORD_REGEX:</span>{" "}
               <p>
                 "Password must be ≥8 chars and include uppercase, lowercase, number, and special (#?!@$%^&*-)."

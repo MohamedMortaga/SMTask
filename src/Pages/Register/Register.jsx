@@ -5,7 +5,7 @@ import axios from "axios";
 /* --- mini UI helpers to match your structure --- */
 function Label({ htmlFor, children }) {
   return (
-    <label htmlFor={htmlFor} className="block text-left text-white">
+    <label htmlFor={htmlFor} className="block text-left dark:text-white light:text-gray-700">
       {children}
     </label>
   );
@@ -31,7 +31,7 @@ function TextInput({
       value={value}
       onChange={onChange}
       autoComplete={autoComplete}
-      className="p-2 rounded w-full outline-none focus:ring-2 focus:ring-teal-600"
+      className="p-2 rounded w-full outline-none focus:ring-2 focus:ring-teal-600 border light:border-gray-300"
     />
   );
 }
@@ -113,13 +113,13 @@ export default function Register() {
   };
 
   return (
-    <div className="bg-teal-500 min-h-[85vh] flex flex-col items-center justify-center py-8">
+    <div className="dark:bg-teal-500 light:bg-teal-400 min-h-[85vh] flex flex-col items-center justify-center py-8">
       <form
         onSubmit={submit}
-        className="text-center w-[90%] md:w-1/2 bg-teal-400 mx-auto p-12 rounded-lg shadow-lg"
+        className="text-center w-[90%] md:w-1/2 dark:bg-teal-400 light:bg-white mx-auto p-12 rounded-lg shadow-lg border light:border-gray-200"
         noValidate
       >
-        <h1 className="text-4xl font-bold text-white uppercase mb-8">
+        <h1 className="text-4xl font-bold dark:text-white light:text-gray-800 uppercase mb-8">
           Register
         </h1>
 
@@ -179,7 +179,7 @@ export default function Register() {
             onChange={change}
             autoComplete="new-password"
           />
-          <p className="text-left text-white/80 text-sm mt-1">
+          <p className="text-left dark:text-white/80 light:text-gray-600 text-sm mt-1">
             Must include A-Z, a-z, 0-9, and special (#?!@$%^&*-), 8+ chars.
           </p>
         </div>
@@ -216,9 +216,9 @@ export default function Register() {
           </div>
 
           <div className="mb-6">
-            <p className="text-left text-white mb-2">Gender</p>
+            <p className="text-left dark:text-white light:text-gray-700 mb-2">Gender</p>
             <div className="flex items-center gap-6">
-              <label className="flex items-center gap-2 text-white">
+              <label className="flex items-center gap-2 dark:text-white light:text-gray-700">
                 <input
                   type="radio"
                   name="gender"
@@ -230,7 +230,7 @@ export default function Register() {
                 Male
               </label>
 
-              <label className="flex items-center gap-2 text-white">
+              <label className="flex items-center gap-2 dark:text-white light:text-gray-700">
                 <input
                   type="radio"
                   name="gender"
@@ -248,7 +248,7 @@ export default function Register() {
         <button
           type="submit"
           disabled={loading}
-          className="bg-white text-teal-500 font-bold py-2 px-20 rounded 
+          className="dark:bg-white dark:text-teal-500 light:bg-teal-600 light:text-white font-bold py-2 px-20 rounded 
                      transition-all duration-300 
                      hover:bg-teal-600 hover:text-white hover:scale-105 
                      active:scale-95 disabled:opacity-60"

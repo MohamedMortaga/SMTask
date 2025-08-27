@@ -80,7 +80,7 @@ const logAxiosError = (label, err) => {
 
 /* ------------ small UI helpers ------------ */
 const Spinner = ({ text = "Loading…" }) => (
-  <div className="text-white/90 text-center">{text}</div>
+  <div className="dark:text-white/90 light:text-gray-700 text-center">{text}</div>
 );
 
 /* ------------ component ------------ */
@@ -377,9 +377,9 @@ export default function Posts() {
 
   /* ---------------- UI ---------------- */
   return (
-    <div className="bg-teal-500 min-h-[85vh] flex flex-col items-center py-16">
+    <div className="dark:bg-teal-500 light:bg-teal-400 min-h-[85vh] flex flex-col items-center py-16">
       <div className="w-[92%] max-w-3xl">
-        <h1 className="text-4xl md:text-5xl font-extrabold text-white uppercase mb-6 text-center">
+        <h1 className="text-4xl md:text-5xl font-extrabold dark:text-white light:text-gray-800 uppercase mb-6 text-center">
           My Posts
         </h1>
 
@@ -397,14 +397,14 @@ export default function Posts() {
         ) : loading && posts.length === 0 ? (
           <Spinner />
         ) : posts.length === 0 ? (
-          <div className="text-white/90 text-center">No posts yet.</div>
+          <div className="dark:text-white/90 light:text-gray-700 text-center">No posts yet.</div>
         ) : (
-          <ul className="space-y-4">
-            {posts.map((p) => (
-              <li
-                key={p.id}
-                className="bg-white/95 rounded-xl shadow-md overflow-hidden"
-              >
+                      <ul className="space-y-4">
+              {posts.map((p) => (
+                <li
+                  key={p.id}
+                  className="dark:bg-white/95 light:bg-white rounded-xl shadow-md overflow-hidden border light:border-gray-200"
+                >
                 {p.image && (
                   <img
                     src={p.image}
@@ -415,19 +415,19 @@ export default function Posts() {
                 )}
                 <div className="p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-800">
-                        {p.author || "You"}
-                      </h3>
-                      {p.createdAt && (
-                        <time
-                          className="text-xs text-gray-500"
-                          dateTime={new Date(p.createdAt).toISOString()}
-                        >
-                          {new Date(p.createdAt).toLocaleString()}
-                        </time>
-                      )}
-                    </div>
+                                         <div>
+                       <h3 className="text-lg font-semibold dark:text-gray-800 light:text-gray-800">
+                         {p.author || "You"}
+                       </h3>
+                       {p.createdAt && (
+                         <time
+                           className="text-xs dark:text-gray-500 light:text-gray-500"
+                           dateTime={new Date(p.createdAt).toISOString()}
+                         >
+                           {new Date(p.createdAt).toLocaleString()}
+                         </time>
+                       )}
+                     </div>
 
                     {/* Actions */}
                     <div className="flex items-center gap-2 shrink-0">
@@ -450,11 +450,11 @@ export default function Posts() {
                     </div>
                   </div>
 
-                  {p.body && (
-                    <p className="mt-3 text-gray-700 whitespace-pre-line">
-                      {p.body}
-                    </p>
-                  )}
+                                     {p.body && (
+                     <p className="mt-3 dark:text-gray-700 light:text-gray-700 whitespace-pre-line">
+                       {p.body}
+                     </p>
+                   )}
                 </div>
               </li>
             ))}
@@ -469,7 +469,7 @@ export default function Posts() {
             className={`px-5 py-2 rounded-lg font-semibold shadow
               ${
                 hasMore && userId
-                  ? "bg-white text-teal-600 hover:bg-teal-700 hover:text-white"
+                  ? "dark:bg-white dark:text-teal-600 light:bg-teal-600 light:text-white hover:bg-teal-700 hover:text-white"
                   : "bg-gray-300 text-gray-500 cursor-not-allowed"
               }`}
           >
@@ -484,8 +484,8 @@ export default function Posts() {
 
       {/* ---------- Edit Modal ---------- */}
       {editOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-3">
-          <div className="w-full max-w-xl bg-white rounded-2xl shadow-xl overflow-hidden">
+                 <div className="fixed inset-0 z-50 flex items-center justify-center dark:bg-black/50 light:bg-black/30 px-3">
+                     <div className="w-full max-w-xl dark:bg-white light:bg-white rounded-2xl shadow-xl overflow-hidden">
             <div className="px-5 py-4 border-b">
               <h2 className="text-lg font-semibold">Edit Post</h2>
             </div>
