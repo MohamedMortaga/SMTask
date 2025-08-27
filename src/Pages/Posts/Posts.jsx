@@ -377,19 +377,19 @@ export default function Posts() {
 
   /* ---------------- UI ---------------- */
   return (
-    <div className="dark:bg-teal-500 light:bg-teal-400 min-h-[85vh] flex flex-col items-center py-16">
+    <div className="bg-teal-500 dark:bg-teal-400 min-h-[85vh] flex flex-col items-center py-16">
       <div className="w-[92%] max-w-3xl">
-        <h1 className="text-4xl md:text-5xl font-extrabold dark:text-white light:text-gray-800 uppercase mb-6 text-center">
+        <h1 className="text-4xl md:text-5xl font-extrabold text-white dark:text-gray-800 uppercase mb-6 text-center">
           My Posts
         </h1>
 
         {!token && (
-          <div className="bg-red-100 text-red-700 p-3 rounded mb-4">
+          <div className="bg-red-100 dark:bg-red-700 text-red-700 dark:text-red-100 p-3 rounded mb-4">
             No user logged in.
           </div>
         )}
         {err && (
-          <div className="bg-red-100 text-red-700 p-3 rounded mb-4">{err}</div>
+          <div className="bg-red-100 dark:bg-red-700 text-red-700 dark:text-red-100 p-3 rounded mb-4">{err}</div>
         )}
 
         {checkingUser ? (
@@ -397,14 +397,14 @@ export default function Posts() {
         ) : loading && posts.length === 0 ? (
           <Spinner />
         ) : posts.length === 0 ? (
-          <div className="dark:text-white/90 light:text-gray-700 text-center">No posts yet.</div>
+          <div className="text-white dark:text-gray-700 text-center">No posts yet.</div>
         ) : (
-                      <ul className="space-y-4">
-              {posts.map((p) => (
-                <li
-                  key={p.id}
-                  className="dark:bg-white/95 light:bg-white rounded-xl shadow-md overflow-hidden border light:border-gray-200"
-                >
+          <ul className="space-y-4">
+            {posts.map((p) => (
+              <li
+                key={p.id}
+                className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden border dark:border-gray-700"
+              >
                 {p.image && (
                   <img
                     src={p.image}
@@ -415,19 +415,19 @@ export default function Posts() {
                 )}
                 <div className="p-4">
                   <div className="flex items-start justify-between gap-3">
-                                         <div>
-                       <h3 className="text-lg font-semibold dark:text-gray-800 light:text-gray-800">
-                         {p.author || "You"}
-                       </h3>
-                       {p.createdAt && (
-                         <time
-                           className="text-xs dark:text-gray-500 light:text-gray-500"
-                           dateTime={new Date(p.createdAt).toISOString()}
-                         >
-                           {new Date(p.createdAt).toLocaleString()}
-                         </time>
-                       )}
-                     </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
+                        {p.author || "You"}
+                      </h3>
+                      {p.createdAt && (
+                        <time
+                          className="text-xs text-gray-500 dark:text-gray-400"
+                          dateTime={new Date(p.createdAt).toISOString()}
+                        >
+                          {new Date(p.createdAt).toLocaleString()}
+                        </time>
+                      )}
+                    </div>
 
                     {/* Actions */}
                     <div className="flex items-center gap-2 shrink-0">
@@ -450,11 +450,11 @@ export default function Posts() {
                     </div>
                   </div>
 
-                                     {p.body && (
-                     <p className="mt-3 dark:text-gray-700 light:text-gray-700 whitespace-pre-line">
-                       {p.body}
-                     </p>
-                   )}
+                  {p.body && (
+                    <p className="mt-3 text-gray-700 dark:text-gray-300 whitespace-pre-line">
+                      {p.body}
+                    </p>
+                  )}
                 </div>
               </li>
             ))}
@@ -469,7 +469,7 @@ export default function Posts() {
             className={`px-5 py-2 rounded-lg font-semibold shadow
               ${
                 hasMore && userId
-                  ? "dark:bg-white dark:text-teal-600 light:bg-teal-600 light:text-white hover:bg-teal-700 hover:text-white"
+                  ? "bg-white text-teal-600 dark:bg-teal-600 dark:text-white hover:bg-teal-700 hover:text-white"
                   : "bg-gray-300 text-gray-500 cursor-not-allowed"
               }`}
           >
@@ -484,24 +484,24 @@ export default function Posts() {
 
       {/* ---------- Edit Modal ---------- */}
       {editOpen && (
-                 <div className="fixed inset-0 z-50 flex items-center justify-center dark:bg-black/50 light:bg-black/30 px-3">
-                     <div className="w-full max-w-xl dark:bg-white light:bg-white rounded-2xl shadow-xl overflow-hidden">
-            <div className="px-5 py-4 border-b">
-              <h2 className="text-lg font-semibold">Edit Post</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-3">
+          <div className="w-full max-w-xl bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden">
+            <div className="px-5 py-4 border-b dark:border-gray-700">
+              <h2 className="text-lg font-semibold text-gray-800 dark:text-white">Edit Post</h2>
             </div>
 
             <div className="p-5 space-y-4">
               {editErr && (
-                <div className="bg-rose-50 text-rose-700 p-2 rounded">
+                <div className="bg-rose-50 dark:bg-rose-900 text-rose-700 dark:text-rose-200 p-2 rounded">
                   {editErr}
                 </div>
               )}
 
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Body
               </label>
               <textarea
-                className="w-full rounded-md border p-2 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className="w-full rounded-md border p-2 focus:outline-none focus:ring-2 focus:ring-teal-500 dark:bg-gray-700 dark:text-white"
                 rows={5}
                 value={editBody}
                 onChange={(e) => setEditBody(e.target.value)}
@@ -509,28 +509,29 @@ export default function Posts() {
               />
 
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Image (optional)
                 </label>
                 <input
                   type="file"
                   accept="image/*"
                   onChange={(e) => onPickImage(e.target.files?.[0] || null)}
+                  className="dark:text-gray-300"
                 />
                 {editImagePreview && (
                   <img
                     src={editImagePreview}
                     alt="preview"
-                    className="w-full max-h-64 object-cover rounded-md border"
+                    className="w-full max-h-64 object-cover rounded-md border dark:border-gray-700"
                     onError={(e) => (e.currentTarget.style.display = "none")}
                   />
                 )}
               </div>
             </div>
 
-            <div className="px-5 py-4 border-t flex items-center justify-end gap-2">
+            <div className="px-5 py-4 border-t dark:border-gray-700 flex items-center justify-end gap-2">
               <button
-                className="px-4 py-2 rounded-md border text-gray-700 hover:bg-gray-50"
+                className="px-4 py-2 rounded-md border text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
                 onClick={closeEdit}
                 disabled={editLoading}
               >
