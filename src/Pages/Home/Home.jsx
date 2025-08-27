@@ -442,7 +442,7 @@ function PostModal({
       onMouseDown={onBackdropMouseDown}
     >
       <div
-        className="bg-gray-900 rounded-2xl shadow-xl w-full max-w-6xl h-[88vh] overflow-hidden grid grid-cols-1 lg:grid-cols-[1fr_380px]"
+        className="bg-gray-900 rounded-2xl shadow-xl w-full max-w-6xl h-[100vh] overflow-hidden grid grid-cols-1 lg:grid-cols-[1fr_380px]"
         onMouseDown={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -494,14 +494,14 @@ function PostModal({
             Comments
           </div>
 
-          <div className="flex-1 overflow-auto p-3 space-y-3">
+          <div className="flex-1 overflow-auto p-3 space-y-1">
             {loading ? (
               <div className="text-gray-300">Loading comments…</div>
             ) : all.length === 0 ? (
               <div className="text-gray-400">No comments yet.</div>
             ) : (
               all.map((c) => (
-                <div key={c.id} className="bg-gray-700 rounded p-3 text-gray-100">
+                <div key={c.id} className="bg-gray-700 rounded-xl p-3 text-gray-100">
                   <div className="flex items-start gap-3">
                     <InitialsAvatar name={c.authorName} src={c.authorAvatar} size={28} />
                     <div className="flex-1">
